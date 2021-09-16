@@ -1,0 +1,32 @@
+#!/usr/bin/python3
+import argparse
+from sp import SP
+
+parser = argparse.ArgumentParser()
+parser.add_argument("corpus", type=str, help="The name of the corpus to process.")
+parser.add_argument("prefix", type=str, help="The words that provide the context for gneeration.")
+parser.add_argument("-v", "--verbose", action="store_true", help="Display verbose output")
+args = parser.parse_args()
+
+s = SP(args.corpus)
+prefix = args.prefix.split()
+i = prefix.index("_")
+if i == -1:
+    print("Prefix must include an _ to mark the place that you want to generate the probabilities for.")
+    exit()
+
+prefix = [s.I[w] if w != "_" else -1 for w in prefix]
+
+cowan = prefix[max(0, i - SP.CowanBufferLength):i]
+miller = prefix[max(0, i - SP.MillerBufferLength):i]
+honeyhasson = prefix[max(0, i - SP.HoneyHassonBufferLength):i]
+kintsch = prefix[max(0, i - SP.KintschBufferLength):i]
+if len(prefix) <= i + 2:
+    if len(prefix) <= i + 1:
+        print (s.strVec(s.prob(prefix[i-2], prefix[i-1], -1, -1, cowan, miller, honeyhasson, kintsch)))
+    else:
+        print (s.strVec(s.prob(prefix[i-2], prefix[i-1], prefix[i+1], -1, cowan, miller, honeyhasson, kintsch)))
+else:
+    print (s.strVec(s.prob(prefix[i-2], prefix[i-1], prefix[i+1], prefix[i+2], cowan, miller, honeyhasson, kintsch)))
+print (s.strNets(cowan, miller, honeyhasson, kintsch))
+
