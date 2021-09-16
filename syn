@@ -1,0 +1,44 @@
+#!/usr/bin/python3
+from scipy.sparse import coo_matrix, save_npz, diags, csr_matrix
+from numpy import zeros, ones, int64, set_printoptions, array, log2, vstack, matmul
+import shelve
+from collections import Counter
+from itertools import combinations_with_replacement, chain
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("corpus", type=str, help="The name of the corpus to process")
+parser.add_argument("-v", "--verbose", action="store_true", help="Display verbose output")
+args = parser.parse_args()
+
+vocab = [w.strip() for w in open(args.corpus+"/vocab", encoding='utf-8').readlines()]
+vocabset = set(vocab)
+V = len(vocab)
+indexes = dict([(w, i) for i, w in enumerate(vocab)])
+words = open(args.corpus+"/corpus").read().lower().split()
+
+set_printoptions(precision=2, linewidth=150, suppress=True)
+
+def makeCountMatrix(width):
+    counts = Counter(chain.from_iterable([(words[j], words[i]) for j in range(max(0, i-width), i)] for i in range(len(words))))
+    i, j, c = zip(*[(k1, k2, counts[(k1, k2)]) for k1, k2 in counts if k1 in vocabset and k2 in vocabset])
+    i = [indexes.get(w) for w in i]
+    j = [indexes.get(w) for w in j]
+    C = coo_matrix((c, (i, j)), shape=(V,V))
+    Cij = C.tocsr()
+    Ci = Cij.diagonal()
+    CiDiag = diags(Ci)
+    Cij -= CiDiag # don't want to double the diagonal so subtract it out then add it back in again
+    Cij += Cij.T
+    Cij += CiDiag
+    return Cij
+
+
+Cij = makeCountMatrix(4)
+save_npz(args.corpus+'/CX.npz', Cij)
+Cij = makeCountMatrix(7)
+save_npz(args.corpus+'/MX.npz', Cij)
+Cij = makeCountMatrix(20)
+save_npz(args.corpus+'/HX.npz', Cij)
+Cij = makeCountMatrix(150)
+save_npz(args.corpus+'/KX.npz', Cij)

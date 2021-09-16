@@ -1,0 +1,97 @@
+#!/usr/bin/python3
+from scipy.sparse import coo_matrix, save_npz, diags
+from numpy import zeros, ones, int64, set_printoptions, array
+import shelve
+import argparse
+from collections import Counter
+
+parser = argparse.ArgumentParser()
+parser.add_argument("corpus", type=str, help="The name of the corpus to process")
+#parser.add_argument("-s", "--maxvocabsize", type=int, help="Specify the maximum size the vocabulary can take. Unique tokens that the program sees after this numberwill be ignored. Default = 20000.", default=20000)
+parser.add_argument("-f", "--frequencycutoff", type=int, help="Word pairs that co-occur with a frequency lower than this parameter will not be considered for entry into the connection matrix. Default = 0.", default=0)
+parser.add_argument("-c", "--count", type=int, help="Number of count lines in each tranche. Default = 8.", default=8)
+parser.add_argument("-o", "--optimize", type=int, help="Number of optimize lines in each tranche. Default = 1.", default=1)
+parser.add_argument("-t", "--test", type=int, help="Number of test lines in each tranche. Default = 1.", default=1)
+
+parser.add_argument("-v", "--verbose", action="store_true", help="Display verbose output")
+args = parser.parse_args()
+
+vocab = [w.strip() for w in open(args.corpus+"/vocab", encoding='utf-8').readlines()]
+vocabset = set(vocab)
+V = len(vocab)
+I = dict([(w.strip(), i) for i, w in enumerate(vocab)])
+
+bigramvocab = [w.strip() for w in open(args.corpus+"/bigramvocab", encoding='utf-8').readlines()]
+bigramvocabset = set(bigramvocab)
+bigramV = len(bigramvocab)
+bigramI = dict([(w.strip(), i) for i, w in enumerate(bigramvocab)])
+
+if args.verbose:
+    print("Read corpus")
+#corpus = open(args.corpus+"/corpus", encoding='utf-8').read().lower().split()
+sentences = open(args.corpus+"/corpus", encoding='utf-8').readlines()
+NumberInTranche = args.count+args.optimize+args.test
+countlines = range(args.count)
+optimizelines = range(args.count, args.count+args.optimize)
+testlines = range(args.count+args.optimize, NumberInTranche)
+sents = [s for i, s in enumerate(sentences) if i%NumberInTranche in countlines]
+corpus = " ".join(sents).lower().split()
+
+
+if args.verbose:
+    print ("Count BC")
+bigrams = Counter(zip(corpus, corpus[1:]))
+if args.verbose:
+    print("Make count matrix")
+i, j, c = zip(*[(k1, k2, bigrams[(k1, k2)]) for k1, k2 in bigrams if k1 in vocabset and k2 in vocabset])
+i = [I.get(w) for w in i]
+j = [I.get(w) for w in j]
+C = coo_matrix((c, (i, j)))
+Cij = C.tocsr()
+Cij.resize((V, V))
+save_npz(args.corpus+'/BC.npz', Cij)
+
+if args.verbose:
+    print ("Count AC")
+o2counts = Counter(zip(corpus, corpus[2:]))
+if args.verbose:
+    print("Make count matrix")
+i, j, c = zip(*[(k1, k2, o2counts[(k1, k2)]) for k1, k2 in o2counts])
+i = [I.get(w, 0) for w in i]
+j = [I.get(w, 0) for w in j]
+C = coo_matrix((c, (i, j)))
+Cij = C.tocsr()
+Cij.resize((V, V))
+save_npz(args.corpus+'/AC.npz', Cij)
+
+if args.verbose:
+    print ("Count ABC")
+
+bigramcorpus = [w1+"_"+w2 for w1, w2 in zip(corpus, corpus[1:-1])]
+trigrams = Counter(zip(bigramcorpus, corpus[2:]))
+
+if args.verbose:
+    print("Make count matrix")
+i, j, c = zip(*[(k1, k2, trigrams[(k1, k2)]) for k1, k2 in trigrams if k1 in bigramvocabset and k2 in vocabset])
+i = [bigramI.get(w) for w in i]
+j = [I.get(w) for w in j]
+C = coo_matrix((c, (i, j)))
+Cij = C.tocsr()
+Cij.resize((bigramV, V))
+save_npz(args.corpus+'/ABC.npz', Cij)
+
+
+bigramcorpus = [w1+"_"+w2 for w1, w2 in zip(corpus[1:], corpus[2:])]
+trigrams = Counter(zip(bigramcorpus, corpus))
+
+if args.verbose:
+    print("Make count matrix")
+i, j, c = zip(*[(k1, k2, trigrams[(k1, k2)]) for k1, k2 in trigrams if k1 in bigramvocabset and k2 in vocabset])
+i = [bigramI.get(w) for w in i]
+j = [I.get(w) for w in j]
+C = coo_matrix((c, (i, j)))
+Cij = C.tocsr()
+Cij.resize((bigramV, V))
+save_npz(args.corpus+'/CBA.npz', Cij)
+
+

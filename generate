@@ -1,0 +1,35 @@
+#!/usr/bin/python3
+import argparse
+from sp import SP
+
+parser = argparse.ArgumentParser()
+parser.add_argument("corpus", type=str, help="The name of the corpus to process.")
+parser.add_argument("prefix", type=str, help="The words that provide the context for gneeration.")
+parser.add_argument("-v", "--verbose", action="store_true", help="Display verbose output")
+args = parser.parse_args()
+
+s = SP(args.corpus)
+
+EndOfUtteranceTokens = set([".", "?", "!"])
+def truncateToks (toks):
+    result = []
+    for i in range(len(toks)):
+        if toks[i] in EndOfUtteranceTokens:
+            result.append(toks[i])
+            break
+        result.append(toks[i])
+    return result
+
+result = args.prefix.split()
+newtoks = ["", "", "", ""]
+iterations = 0
+while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 6:
+    toks = s.sampler(result, BufferLength = len(result) + 4)
+    toks = toks.split()[len(result):]
+    newtoks = truncateToks(toks)
+    result += newtoks
+    iterations += 1
+
+print (" ".join(result))
+     
+
