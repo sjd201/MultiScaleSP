@@ -30,15 +30,13 @@ class SP():
     epsilon = 0.00000000001
     laplace = 1.0
 
-    def __init__(self, corpus):
+    def __init__(self, corpus, constraints="X BX AX XB XA ABX XBA CX MX HX KX CI MI HI KI"):
         self.corpus = corpus
+        self.constraints = set(constraints.split())  # which parameters to change when learning
         self.lam = 0.0001
         self.vocab = [w.strip() for w in open(corpus+"/vocab", encoding='utf-8').readlines()]
         self.V = len(self.vocab)
         self.I = dict([(w.strip(), i) for i, w in enumerate(self.vocab)])
-        #with open(corpus+"/corpus.train", encoding='ascii') as f:
-        #    self.words = [self.I[w] for w in f.read().lower().split()]
-
         self.bigramvocab = [w.strip() for w in open(self.corpus+"/bigramvocab", encoding='utf-8').readlines()]
         self.bigramV = len(self.bigramvocab)
         self.bigramI = dict([(w.strip(), i) for i, w in enumerate(self.bigramvocab)])
@@ -80,40 +78,38 @@ class SP():
 
         # init net input variables
 
-        self.netAX = None
-        self.netXX = None
-        self.netMX = None
-        self.netHX = None
-        self.netKX = None
-        self.netXI = None
-        self.netMI = None
-        self.netHI = None
-        self.netKI = None
         self.netBX = None
+        self.netAX = None
         self.netXA = None
         self.netXB = None
         self.netABX = None
         self.netXBA = None
         self.netX = None
+        self.netCX = None
+        self.netMX = None
+        self.netHX = None
+        self.netKX = None
+        self.netCI = None
+        self.netMI = None
+        self.netHI = None
+        self.netKI = None
 
     def initParams(self):
         self.Gax = 0.0
         self.Gbx = 0.0
         self.Gxa = 0.0
         self.Gxb = 0.0
-        self.Gxi = 0.0 # Miller scale inhibition
+        self.Gci = 0.0 # Cowan scale inhibition
         self.Gmi = 0.0 # Miller scale inhibition
-        self.Ghi = 0.0 # Miller scale inhibition
-        self.Gki = 0.0 # Miller scale inhibition
+        self.Ghi = 0.0 # Honey Hasson scale inhibition
+        self.Gki = 0.0 # Kintsch scale inhibition
         self.Gx = 0.0
         self.Gabx = 0.0
         self.Gxba = 0.0
-        self.Gxx = zeros((self.V, 1))
+        self.Gcx = zeros((self.V, 1))
         self.Gmx = zeros((self.V, 1))
         self.Ghx = zeros((self.V, 1))
         self.Gkx = zeros((self.V, 1))
-        self.Gi = 0. # self inhibition - could be at multiple scales also
-                     # also might want to remove diagonals in count matrices
 
     def strVec(self, v, NumToReport=14):
   
@@ -139,14 +135,14 @@ class SP():
         params["Gxa"] = self.Gxa
         params["Gabx"] = self.Gabx
         params["Gxba"] = self.Gxba
-        params["Gxx"] = self.Gxx
+        params["Gcx"] = self.Gcx
         params["Gmx"] = self.Gmx
-        params["Gxi"] = self.Gxi
+        params["Ghx"] = self.Ghx
+        params["Gkx"] = self.Gkx
+        params["Gci"] = self.Gci
         params["Gmi"] = self.Gmi
         params["Ghi"] = self.Ghi
         params["Gki"] = self.Gki
-        params["Ghx"] = self.Ghx
-        params["Gkx"] = self.Gkx
         params["Gx"] = self.Gx
         params.close()
 
@@ -167,12 +163,12 @@ class SP():
             self.Gabx = params["Gabx"]
         if "Gxba" in params.keys():
             self.Gxba = params["Gxba"]
-        if "Gxx" in params.keys():
-            self.Gxx = params["Gxx"]
+        if "Gcx" in params.keys():
+            self.Gcx = params["Gcx"]
         if "Gmx" in params.keys():
             self.Gmx = params["Gmx"]
-        if "Gxi" in params.keys():
-            self.Gxi = params["Gxi"]
+        if "Gci" in params.keys():
+            self.Gci = params["Gci"]
         if "Gmi" in params.keys():
             self.Gmi = params["Gmi"]
         if "Ghi" in params.keys():
@@ -187,8 +183,8 @@ class SP():
 
     def strParams(self, NumToReport=15):
         result =  f"Gabx = {self.Gabx:1.3f} Gxba = {self.Gxba:1.3f} Gax = {self.Gax:1.3f} Gbx = {self.Gbx:1.3f} Gxa = {self.Gxa:1.3f} Gxb = {self.Gxb:1.3f} Gx = {self.Gx:1.3f}\n"
-        result += f"Gxi = {self.Gxi:1.3f} Gmi = {self.Gmi:1.3f} Ghi = {self.Ghi:1.3f} Gki = {self.Gki:1.3f}\n"
-        result +=  f"Gxx = {self.strVec(self.Gxx, NumToReport)}\n"
+        result += f"Gci = {self.Gci:1.3f} Gmi = {self.Gmi:1.3f} Ghi = {self.Ghi:1.3f} Gki = {self.Gki:1.3f}\n"
+        result +=  f"Gcx = {self.strVec(self.Gcx, NumToReport)}\n"
         result +=  f"Gmx = {self.strVec(self.Gmx, NumToReport)}\n"
         result +=  f"Ghx = {self.strVec(self.Ghx, NumToReport)}\n"
         result +=  f"Gkx = {self.strVec(self.Gkx, NumToReport)}\n"
@@ -204,19 +200,19 @@ class SP():
         if self.netABX is not None: 
             result += f"ABX: {self.strVec(self.Gabx * self.netABX)}\n"
         #for i, w in enumerate(cowan):
-        #    #result += f"CX({self.vocab[w]}): {self.strVec(self.netXX[i])}\n"
-        #    result += f"weighted CX({self.vocab[w]}): {self.strVec(self.Gxx[w, 0] * self.netXX[i, :])}\n"
+        #    #result += f"CX({self.vocab[w]}): {self.strVec(self.netCX[i])}\n"
+        #    result += f"weighted CX({self.vocab[w]}): {self.strVec(self.Gcx[w, 0] * self.netCX[i, :])}\n"
         #for i, w in enumerate(miller):
         #    #result += f"MX({self.vocab[w]}): {self.strVec(self.netMX[i])}\n"
         #    result += f"weighted MX({self.vocab[w]}): {self.strVec(self.Gmx[w, 0] * self.netMX[i, :])}\n"
         #for i, w in enumerate(kintsch):
         #    #result += f"KX({self.vocab[w]}): {self.strVec(self.netKX[i])}\n"
         #    result += f"weighted KX({self.vocab[w]}): {self.strVec(self.Gkx[w, 0] * self.netKX[i, :])}\n"
-        result += f"CX: {self.strVec(self.Gxx[cowan, 0] * self.netXX)}\n"
+        result += f"CX: {self.strVec(self.Gcx[cowan, 0] * self.netCX)}\n"
         result += f"MX: {self.strVec(self.Gmx[miller, 0] * self.netMX)}\n"
         result += f"HX: {self.strVec(self.Ghx[honeyhasson, 0] * self.netHX)}\n"
         result += f"KX: {self.strVec(self.Gkx[kintsch, 0] * self.netKX)}\n"
-        result += f"CI: {self.strVec(self.Gxi * self.netXI)}\n"
+        result += f"CI: {self.strVec(self.Gci * self.netCI)}\n"
         result += f"MI: {self.strVec(self.Gmi * self.netMI)}\n"
         result += f"HI: {self.strVec(self.Ghi * self.netHI)}\n"
         result += f"KI: {self.strVec(self.Gki * self.netKI)}\n"
@@ -260,21 +256,21 @@ class SP():
             self.netXBA = self.XBA[baafter,:]
         self.netX = self.X
 
-        self.netXX = self.CX[cowan,:]/(len(cowan)+SP.epsilon)
+        self.netCX = self.CX[cowan,:]/(len(cowan)+SP.epsilon)
         self.netMX = self.MX[miller,:]/(len(miller)+SP.epsilon)
         self.netHX = self.HX[honeyhasson,:]/(len(honeyhasson)+SP.epsilon)
         self.netKX = self.KX[kintsch,:]/(len(kintsch)+SP.epsilon)
 
-        #self.netXI = zeros((1, self.V))
+        #self.netCI = zeros((1, self.V))
         #self.netMI = zeros((1, self.V))
         #self.netHI = zeros((1, self.V))
         #self.netKI = zeros((1, self.V))
 
-        self.netXI = csr_matrix((1, self.V))
+        self.netCI = csr_matrix((1, self.V))
         self.netMI = csr_matrix((1, self.V))
         self.netHI = csr_matrix((1, self.V))
         self.netKI = csr_matrix((1, self.V))
-        self.netXI[0, cowan] = 1.
+        self.netCI[0, cowan] = 1.
         self.netMI[0, miller] = 1.
         self.netHI[0, honeyhasson] = 1.
         self.netKI[0, kintsch] = 1.
@@ -282,8 +278,8 @@ class SP():
         net = self.Gax * self.netAX 
         net += self.Gbx * self.netBX
         net += self.Gx * self.netX
-        net += self.Gxx[cowan, 0] * self.netXX
-        net += self.Gxi * self.netXI
+        net += self.Gcx[cowan, 0] * self.netCX
+        net += self.Gci * self.netCI
         net += self.Gmx[miller, 0] * self.netMX
         net += self.Gmi * self.netMI
         net += self.Ghx[honeyhasson, 0] * self.netHX
@@ -349,28 +345,43 @@ class SP():
                 delta [0,c] += 1
 
                 delta = csr_matrix(delta)
-                self.Gbx += self.lam * dot(delta, self.netBX.T)[0,0]
-                self.Gax += self.lam * dot(delta, self.netAX.T)[0,0]
-                self.Gxa += self.lam * dot(delta, self.netXA.T)[0,0]
-                self.Gxb += self.lam * dot(delta, self.netXB.T)[0,0]
+                if "BX" in self.constraints:
+                    self.Gbx += self.lam * dot(delta, self.netBX.T)[0,0]
+                if "AX" in self.constraints:
+                    self.Gax += self.lam * dot(delta, self.netAX.T)[0,0]
+                if "XA" in self.constraints:
+                    self.Gxa += self.lam * dot(delta, self.netXA.T)[0,0]
+                if "XB" in self.constraints:
+                    self.Gxb += self.lam * dot(delta, self.netXB.T)[0,0]
                 if self.netABX is not None:
-                    self.Gabx += self.lam * dot(delta, self.netABX.T)[0,0]   
+                    if "ABX" in self.constraints:
+                        self.Gabx += self.lam * dot(delta, self.netABX.T)[0,0]   
                 if self.netXBA is not None:
-                    self.Gxba += self.lam * dot(delta, self.netXBA.T)[0,0]
+                    if "XBA" in self.constraints:
+                        self.Gxba += self.lam * dot(delta, self.netXBA.T)[0,0]
                 if len(cowan) > 0:
-                    self.Gxx[cowan] += self.lam * dot(self.netXX, delta.T)
-                    self.Gxi += self.lam * dot(self.netXI, delta.T)[0,0]
+                    if "CX" in self.constraints:
+                        self.Gcx[cowan] += self.lam * dot(self.netCX, delta.T)
+                    if "CI" in self.constraints:
+                        self.Gci += self.lam * dot(self.netCI, delta.T)[0,0]
                 if len(miller) > 0:
-                    self.Gmx[miller] += self.lam * dot(self.netMX, delta.T)
-                    self.Gmi += self.lam * dot(self.netMI, delta.T)[0,0]
+                    if "MX" in self.constraints:
+                        self.Gmx[miller] += self.lam * dot(self.netMX, delta.T)
+                    if "MI" in self.constraints:
+                        self.Gmi += self.lam * dot(self.netMI, delta.T)[0,0]
                 if len(honeyhasson) > 0:
-                    self.Ghx[honeyhasson] += self.lam * dot(self.netHX, delta.T)
-                    self.Ghi += self.lam * dot(self.netHI, delta.T)[0,0]
+                    if "HX" in self.constraints:
+                        self.Ghx[honeyhasson] += self.lam * dot(self.netHX, delta.T)
+                    if "HI" in self.constraints:
+                        self.Ghi += self.lam * dot(self.netHI, delta.T)[0,0]
                 if len(kintsch) > 0:
-                    self.Gkx[kintsch] += self.lam * dot(self.netKX, delta.T)
-                    self.Gki += self.lam * dot(self.netKI, delta.T)[0,0]
+                    if "KX" in self.constraints:
+                        self.Gkx[kintsch] += self.lam * dot(self.netKX, delta.T)
+                    if "KI" in self.constraints:
+                        self.Gki += self.lam * dot(self.netKI, delta.T)[0,0]
                 self.netX = csr_matrix(self.netX)
-                self.Gx += self.lam * dot(delta, self.netX.T)[0,0]
+                if "X" in self.constraints:
+                    self.Gx += self.lam * dot(delta, self.netX.T)[0,0]
         return loglik/count
     
 
