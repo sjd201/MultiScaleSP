@@ -1,31 +1,11 @@
-#!/usr/bin/python3
+#!/home/simon/MultiscaleSP/venv/bin/python3
+
 import argparse
-from collections import Counter
+from bytepair import learn
+
 parser = argparse.ArgumentParser()
 parser.add_argument("corpus", type=str, help="The name of the corpus to process")
-parser.add_argument("-s", "--maxvocabsize", type=int, help="Specify the maximum size the vocabulary can take. Default = 20000.", default=20000)
-parser.add_argument("-b", "--maxbigramvocabsize", type=int, help="Specify the maximum size the vocabulary can take. Default = 80000.", default=80000)
-parser.add_argument("-v", "--verbose", action="store_true", help="Display verbose output")
+parser.add_argument("-V", "--V", type=int, help="Specify the maximum size the vocabulary can take. Unique tokens that the program sees after this number will be ignored. Default = 10000.", default=10000)
 args = parser.parse_args()
 
-
-corpus = open(args.corpus+"/corpus", encoding='utf-8').read()
-words = corpus.lower().split()
-sentences = corpus.lower().split("\n")
-
-counts = Counter(words)
-vocab = [w for w, c in counts.most_common(args.maxvocabsize)]
-
-with open(args.corpus+"/vocab", "w", encoding='utf-8') as vocabfile:   
-  print ("\n".join(vocab), file=vocabfile)
-
-counts = Counter(w1+"_" + w2 for w1, w2 in zip(words, words[1:]))
-bigramvocab = [w for w, c in counts.most_common(args.maxbigramvocabsize)]
-
-with open(args.corpus+"/bigramvocab", "w", encoding='utf-8') as vocabfile:   
-  print ("\n".join(bigramvocab), file=vocabfile)
-
-with open(args.corpus+"/NumberOfSentences", "w", encoding='utf-8') as NumberOfSentencesfile:   
-  print (len(sentences), file=NumberOfSentencesfile)
-  
-
+learn(args.corpus, args.V)

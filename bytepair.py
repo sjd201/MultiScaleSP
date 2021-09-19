@@ -1,27 +1,21 @@
 import re
 from collections import Counter, defaultdict
 from nltk.tokenize import word_tokenize
-import argparse
 import functools
 import operator
 import sys
-import unicodedata
+from unidecode import unidecode
 
-
-parser = argparse.ArgumentParser()
-parser.add_argument("corpus", type=str, help="The name of the corpus to process")
-parser.add_argument("-V", "--V", type=int, help="Specify the maximum size the vocabulary can take. Unique tokens that the program sees after this number will be ignored. Default = 10000.", default=10000)
-
-args = parser.parse_args()
-basetokens = "abcdefghijklmnopqrstuvwxyz0123456789()[]+-?.,!$%^&"
+basetokens = "abcdefghijklmnopqrstuvwxyz0123456789()[]+-?.,!$%^&_"
 EndOfWordCharacter = '_' # note this is not the standard underscore character
+EndOfWordCharacter = '_' 
 
 def build_vocab(corpus: str) -> dict:
     """Step 1. Build vocab from text corpus"""
 
     # Separate each char in word by space and add mark end of token
     #tokens = [" ".join(word) + " </w>" for word in corpus.split()]
-    tokens = [" ".join(word) + EndOfWordCharacter for word in corpus+[basetokens]]
+    tokens = [EndOfWordCharacter+" ".join(word) + EndOfWordCharacter for word in corpus+[basetokens]]
 
     # Count frequency of tokens in corpus
     vocab = Counter(tokens)  
@@ -70,58 +64,76 @@ def get_tokens_from_vocab(vocab):
 def flatten(l):
     return functools.reduce(operator.iconcat, l, [])
 
-def bytepairtokenize(s):
-  words = [word + EndOfWordCharacter for word in word_tokenize(s)]
+def bytepairtokenize(s, pattern):
+  words = [EndOfWordCharacter + word + EndOfWordCharacter for word in word_tokenize(s)]
   return flatten([m.group() for m in re.finditer(pattern, word) if m.group() != ""] for word in words)
 
-# create vocab
+def learn (corpus, V):
+  # create vocab
 
-with open(args.corpus+"/corpus", encoding='utf-8') as f:
-    text = unicodedata.normalize('NFKD', f.read()).encode('ascii','ignore')
-    print (text)
-    corpus = word_tokenize(text)
+  with open(corpus+"/rawcorpus", encoding='utf-8') as f:
+      #text = unicodedata.normalize('NFKD', f.read()).encode('ascii','ignore')
+      text = unidecode(f.read()).lower()
+      toks = word_tokenize(text)
 
-vocab = build_vocab(corpus)  # Step 1
+  vocab = build_vocab(toks)  # Step 1
 
-num_merges = args.V - len(basetokens)  # Hyperparameter
+  num_merges = V - len(basetokens)  # Hyperparameter
 
-for i in range(num_merges):
+  for i in range(num_merges):
 
-    pairs = get_stats(vocab)  # Step 2
-    
-    if not pairs:
-        break
+      pairs = get_stats(vocab)  # Step 2
+      
+      if not pairs:
+          break
 
-    # step 3
-    best = max(pairs, key=pairs.get)
-    if pairs[best] == 1: # only continue merging if you have seen the sequence at least twice
-        sys.stderr.write("Remaining sequence candidates have only been seen once.\n")
-        break
-    vocab = merge_vocab(best, vocab)
-    sys.stderr.write(f"merge {i+1} of {num_merges} done.\n")
+      # step 3
+      best = max(pairs, key=pairs.get)
+      if pairs[best] == 1: # only continue merging if you have seen the sequence at least twice
+          sys.stderr.write("Remaining sequence candidates have only been seen once.\n")
+          break
+      vocab = merge_vocab(best, vocab)
+      if i % 100 == 0:
+          sys.stderr.write(f"merge {i+1} of up to {num_merges} done.\n")
 
-toks = [(len(tok), tok) for tok in get_tokens_from_vocab(vocab)[0].keys()]
-toks.sort(reverse=True)
-toks = [tok for i, tok in toks]
-
-
-# write vocab
-
-with open(args.corpus+"/vocab", "w", encoding='utf-8') as vocabfile:   
-  print ("\n".join(toks), file=vocabfile)
-
-pattern = "|".join(toks) + "|\ |\n"
-pattern = re.sub("\?", "\\\?", pattern)
-pattern = re.sub("\.", "\\\.", pattern)
-pattern = re.sub("\[", "\\\[", pattern)
-pattern = re.sub("\]", "\\\]", pattern)
-pattern = re.sub("\+", "\\\+", pattern)
-pattern = re.sub("\*", "\\\*", pattern)
-pattern = re.sub("\(", "\\\(", pattern)
-pattern = re.sub("\)", "\\\)", pattern)
-pattern = re.sub("\_", "\\\_", pattern)
-pattern += "|_"
+  toks = [(len(tok), tok) for tok in get_tokens_from_vocab(vocab)[0].keys()]
+  toks.sort(reverse=True)
+  toks = [tok for i, tok in toks]
 
 
-for line in open(args.corpus+"/corpus").readlines():
-    print (" ".join(bytepairtokenize(line)))
+  # write vocab
+
+  with open(corpus+"/vocab", "w", encoding='ascii') as vocabfile:   
+    print ("\n".join(toks), file=vocabfile)
+
+def tokenize(corpus):
+
+    # get vocab from vocab file
+
+    toks = []
+    for line in open(corpus+"/vocab", "r", encoding='ascii'):   
+        toks.append(line.strip())
+
+    # create a regular expression with the toks
+
+    pattern = "|".join(re.escape(tok) for tok in toks) + "|\ |\n"
+
+    # should compile pattern
+
+    # go through corpus a line at a time tokenizing
+
+
+    print (f"tokenizing {corpus}/corpus => {corpus}/corpus.tok")
+    with open(corpus+"/corpus.tok", "w") as corpusfile:
+        for line in open(corpus+"/corpus"):
+            print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
+
+    print (f"tokenizing {corpus}/train => {corpus}/train.tok")
+    with open(corpus+"/train.tok", "w") as corpusfile:
+        for line in open(corpus+"/train"):
+            print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
+
+    print (f"tokenizing {corpus}/test => {corpus}/test.tok")
+    with open(corpus+"/test.tok", "w") as corpusfile:
+        for line in open(corpus+"/test"):
+            print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
