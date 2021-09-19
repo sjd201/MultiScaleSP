@@ -5,6 +5,7 @@ import shelve
 from numpy.random import choice
 set_printoptions(precision=2, edgeitems = 10, linewidth=200)
 import warnings
+from bytepair import bpstr
 #warnings.filterwarnings("ignore", message="Changing the sparsity structure of a csr_matrix is expensive.")
 
 def sigmoid(v):
@@ -316,7 +317,7 @@ class SP():
                 buffer[j] = c
                 bufferprobs[j] = ps[0, c]
             key = " ".join(self.vocab[w] for w in buffer)
-            print (" ".join(self.vocab[buffer[k]] if k < len(prefix) else f"{self.vocab[buffer[k]]} ({bufferprobs[k]:1.2f})" for k in range(len(buffer))))
+            print (" ".join(bpstr([self.vocab[buffer[k]]]) if k < len(prefix) else f"{bpstr([self.vocab[buffer[k]]])} ({bufferprobs[k]:1.2f})" for k in range(len(buffer))))
             counts[key] += 1
         return counts.most_common(1)[0][0]
 

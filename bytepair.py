@@ -140,9 +140,10 @@ def tokenize(corpus):
 
 def bpstr(l):
     result = ""
-    for tok in l:
+    for i in range(len(l)):
+        tok = l[i]
         if tok[-1] == "_":
-            if tok == l[-1]:
+            if i == len(l)-1:
                 tok = tok[0:-1]
             else:
                 tok = tok[0:-1] + " "
@@ -152,4 +153,6 @@ def bpstr(l):
     return result
 
 
-print (bpstr(["_april_", "_is_", "_beg", "in", "ing_", "_today_"]))
+#print (bpstr(["_april_", "_is_", "_beg", "in", "ing_", "_today_"]))
+#s = ['_april_', '_is_', '_the_', '_sea', 's', 'on', 'al_', '_equivalent_', '_of_', '_october_', '_in_', '_the_', '_year_', '_,_', '_and_', '_in_', '_leap_', '_years_', '_,_', '_april_', '_fin', 'ishes_', '_on_', '_the_', '_same_', '_day_', '_of_']
+#print (bpstr(s))

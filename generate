@@ -1,6 +1,7 @@
-#!/usr/bin/python3
+#!/home/simon/MultiscaleSP/venv/bin/python3
 import argparse
 from sp import SP
+from bytepair import bpstr
 
 parser = argparse.ArgumentParser()
 parser.add_argument("corpus", type=str, help="The name of the corpus to process.")
@@ -10,7 +11,7 @@ args = parser.parse_args()
 
 s = SP(args.corpus)
 
-EndOfUtteranceTokens = set([".", "?", "!"])
+EndOfUtteranceTokens = set(["_._", "_?_", "_!_"])
 def truncateToks (toks):
     result = []
     for i in range(len(toks)):
@@ -30,6 +31,7 @@ while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 6:
     result += newtoks
     iterations += 1
 
-print (" ".join(result))
+print (result)
+print (bpstr(result))
      
 
