@@ -1,11 +1,11 @@
-from numpy import exp, array, zeros, log, ones, dot, set_printoptions, log2
+from numpy import exp, array, zeros, ones, dot, set_printoptions, log2
 from collections import Counter
 from scipy.sparse import load_npz, lil_matrix, csr_matrix
 import shelve
 from numpy.random import choice
 set_printoptions(precision=2, edgeitems = 10, linewidth=200)
 import warnings
-warnings.filterwarnings("ignore", message="Changing the sparsity structure of a csr_matrix is expensive.")
+#warnings.filterwarnings("ignore", message="Changing the sparsity structure of a csr_matrix is expensive.")
 
 def sigmoid(v):
     try:
@@ -28,51 +28,19 @@ class SP():
     HoneyHassonBufferLength = 20
     KintschBufferLength = 150
     epsilon = 0.00000000001
-    laplace = 1.0
+    lidstone = 0.000001
 
     def __init__(self, corpus, constraints="X BX AX XB XA ABX XBA CX MX HX KX CI MI HI KI"):
         self.corpus = corpus
         self.constraints = set(constraints.split())  # which parameters to change when learning
-        self.lam = 0.0001
+        self.lam = 0.001
         self.vocab = [w.strip() for w in open(corpus+"/vocab", encoding='utf-8').readlines()]
         self.V = len(self.vocab)
         self.I = dict([(w.strip(), i) for i, w in enumerate(self.vocab)])
         self.bigramvocab = [w.strip() for w in open(self.corpus+"/bigramvocab", encoding='utf-8').readlines()]
         self.bigramV = len(self.bigramvocab)
         self.bigramI = dict([(w.strip(), i) for i, w in enumerate(self.bigramvocab)])
-  
-        self.BX = load_npz(self.corpus+f"/BX.npz")
-        self.X = self.BX.sum(axis=0)
-        self.AX = load_npz(self.corpus+f"/AX.npz")
-        self.ABX = load_npz(self.corpus+f"/ABX.npz")
-        self.XBA = load_npz(self.corpus+f"/XBA.npz")
-        self.CX = load_npz(self.corpus+f"/CX.npz")
-        self.MX = load_npz(self.corpus+f"/MX.npz")
-        self.HX = load_npz(self.corpus+f"/HX.npz")
-        self.KX = load_npz(self.corpus+f"/KX.npz")
-
-        #self.BX = log(self.BX.todense()+SP.laplace)
-        #self.X = log(self.X+SP.laplace)
-        #self.AX = log(self.AX.todense()+SP.laplace)
-        #self.ABX = log(self.ABX.todense()+SP.laplace)
-        #self.XBA = log(self.XBA.todense()+SP.laplace)
-        #self.CX = log(self.CX.todense()+SP.laplace)
-        #self.MX = log(self.MX.todense()+SP.laplace)
-        #self.HX = log(self.HX.todense()+SP.laplace)
-        #self.KX = log(self.KX.todense()+SP.laplace)
-
-        # do log transform of counts
-
-        self.BX.data = log(self.BX.data+SP.laplace)
-        self.X = log(self.X+SP.laplace)
-        self.AX.data = log(self.AX.data+SP.laplace)
-        self.ABX.data = log(self.ABX.data+SP.laplace)
-        self.XBA.data = log(self.XBA.data+SP.laplace)
-        self.CX.data = log(self.CX.data+SP.laplace)
-        self.MX.data = log(self.MX.data+SP.laplace)
-        self.HX.data = log(self.HX.data+SP.laplace)
-        self.KX.data = log(self.KX.data+SP.laplace)
-
+        self.CountsLoaded = False
         self.initParams()
         self.loadParams()
 
@@ -93,6 +61,28 @@ class SP():
         self.netMI = None
         self.netHI = None
         self.netKI = None
+
+    def loadCounts(self):
+        self.BX = load_npz(self.corpus+f"/BX.npz")
+        self.X = self.BX.sum(axis=0)
+        self.AX = load_npz(self.corpus+f"/AX.npz")
+        self.ABX = load_npz(self.corpus+f"/ABX.npz")
+        self.XBA = load_npz(self.corpus+f"/XBA.npz")
+        self.CX = load_npz(self.corpus+f"/CX.npz")
+        self.MX = load_npz(self.corpus+f"/MX.npz")
+        self.HX = load_npz(self.corpus+f"/HX.npz")
+        self.KX = load_npz(self.corpus+f"/KX.npz")
+
+        self.BX = log2(self.BX.todense()+SP.lidstone)
+        self.X = log2(self.X+SP.lidstone)
+        self.AX = log2(self.AX.todense()+SP.lidstone)
+        self.ABX = log2(self.ABX.todense()+SP.lidstone)
+        self.XBA = log2(self.XBA.todense()+SP.lidstone)
+        self.CX = log2(self.CX.todense()+SP.lidstone)
+        self.MX = log2(self.MX.todense()+SP.lidstone)
+        self.HX = log2(self.HX.todense()+SP.lidstone)
+        self.KX = log2(self.KX.todense()+SP.lidstone)
+        self.CountsLoaded = True
 
     def initParams(self):
         self.Gax = 0.0
@@ -120,10 +110,12 @@ class SP():
       c = Counter(dict(enumerate(v2[0:len(self.vocab)])))
       res = ""
       for i,n in c.most_common(int(NumToReport/2)):
-            res += "{0} {1:1.3f} ".format(self.vocab[i], n)
+           if abs(n) > 0.0001:
+               res += "{0} {1:1.3f} ".format(self.vocab[i], n)
       res += " ... "
       for i,n in c.most_common()[:-int(NumToReport/2)-1:-1][::-1]:
-            res += "{0} {1:1.3f} ".format(self.vocab[i], n)
+           if abs(n) > 0.0001:
+               res += "{0} {1:1.3f} ".format(self.vocab[i], n)
       return res
 
     def saveParams(self):
@@ -230,6 +222,11 @@ class SP():
         return result
 
     def prob(self, a, b, bafter, aafter, cowan, miller, honeyhasson, kintsch):
+
+        # lazy load counts and do log transform
+        if not self.CountsLoaded:
+            self.loadCounts()
+
         abkey = self.vocab[a]+"_"+self.vocab[b]
         if abkey in self.bigramI:
             ab = self.bigramI[abkey]
@@ -261,15 +258,15 @@ class SP():
         self.netHX = self.HX[honeyhasson,:]/(len(honeyhasson)+SP.epsilon)
         self.netKX = self.KX[kintsch,:]/(len(kintsch)+SP.epsilon)
 
-        #self.netCI = zeros((1, self.V))
-        #self.netMI = zeros((1, self.V))
-        #self.netHI = zeros((1, self.V))
-        #self.netKI = zeros((1, self.V))
+        self.netCI = zeros((1, self.V))
+        self.netMI = zeros((1, self.V))
+        self.netHI = zeros((1, self.V))
+        self.netKI = zeros((1, self.V))
 
-        self.netCI = csr_matrix((1, self.V))
-        self.netMI = csr_matrix((1, self.V))
-        self.netHI = csr_matrix((1, self.V))
-        self.netKI = csr_matrix((1, self.V))
+        #self.netCI = csr_matrix((1, self.V))
+        #self.netMI = csr_matrix((1, self.V))
+        #self.netHI = csr_matrix((1, self.V))
+        #self.netKI = csr_matrix((1, self.V))
         self.netCI[0, cowan] = 1.
         self.netMI[0, miller] = 1.
         self.netHI[0, honeyhasson] = 1.
@@ -316,7 +313,6 @@ class SP():
                 else:
                     ps = array(self.prob(buffer[j-2], buffer[j-1], buffer[j+1], buffer[j+2], cowan, miller, honeyhasson, kintsch))
                 c = choice(range(self.V), 1, p=ps.ravel())[0]
-                #print (self.vocab[c], ": ", self.strVec(ps))
                 buffer[j] = c
                 bufferprobs[j] = ps[0, c]
             key = " ".join(self.vocab[w] for w in buffer)
@@ -344,7 +340,7 @@ class SP():
                 delta = -output 
                 delta [0,c] += 1
 
-                delta = csr_matrix(delta)
+                #delta = csr_matrix(delta)
                 if "BX" in self.constraints:
                     self.Gbx += self.lam * dot(delta, self.netBX.T)[0,0]
                 if "AX" in self.constraints:
@@ -379,7 +375,8 @@ class SP():
                         self.Gkx[kintsch] += self.lam * dot(self.netKX, delta.T)
                     if "KI" in self.constraints:
                         self.Gki += self.lam * dot(self.netKI, delta.T)[0,0]
-                self.netX = csr_matrix(self.netX)
+                #self.netX = csr_matrix(self.netX)
+
                 if "X" in self.constraints:
                     self.Gx += self.lam * dot(delta, self.netX.T)[0,0]
         return loglik/count
