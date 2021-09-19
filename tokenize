@@ -1,0 +1,10 @@
+#!/home/simon/MultiscaleSP/venv/bin/python3
+
+import argparse
+from bytepair import tokenize
+
+parser = argparse.ArgumentParser()
+parser.add_argument("corpus", type=str, help="The name of the raw corpus to process")
+args = parser.parse_args()
+
+tokenize(args.corpus)
