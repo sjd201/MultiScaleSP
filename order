@@ -14,7 +14,7 @@ vocabset = set(vocab)
 V = len(vocab)
 I = dict([(w, i) for i, w in enumerate(vocab)])
 
-bigramvocab = [w.strip() for w in open(args.corpus+"/bigramvocab", encoding='utf-8').readlines()]
+bigramvocab = [w.strip() for w in open(args.corpus+"/bigramvocab", encoding='ascii').readlines()]
 bigramvocabset = set(bigramvocab)
 bigramV = len(bigramvocab)
 bigramI = dict([(w, i) for i, w in enumerate(bigramvocab)])
