@@ -137,3 +137,19 @@ def tokenize(corpus):
     with open(corpus+"/test.tok", "w") as corpusfile:
         for line in open(corpus+"/test"):
             print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
+
+def bpstr(l):
+    result = ""
+    for tok in l:
+        if tok[-1] == "_":
+            if tok == l[-1]:
+                tok = tok[0:-1]
+            else:
+                tok = tok[0:-1] + " "
+        if tok[0] == "_":
+            tok = tok[1:]
+        result += tok
+    return result
+
+
+print (bpstr(["_april_", "_is_", "_beg", "in", "ing_", "_today_"]))
