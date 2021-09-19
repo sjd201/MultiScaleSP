@@ -15,7 +15,7 @@ vocab = [w.strip() for w in open(args.corpus+"/vocab", encoding='utf-8').readlin
 vocabset = set(vocab)
 V = len(vocab)
 indexes = dict([(w, i) for i, w in enumerate(vocab)])
-words = open(args.corpus+"/corpus").read().lower().split()
+words = open(args.corpus+"/corpus.tok").read().lower().split()
 
 set_printoptions(precision=2, linewidth=150, suppress=True)
 
