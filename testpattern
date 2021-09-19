@@ -4,12 +4,21 @@ from sp import SP
 
 parser = argparse.ArgumentParser()
 parser.add_argument("corpus", type=str, help="The name of the corpus to process.")
-parser.add_argument("prefix", type=str, help="The words that provide the context for gneeration.")
+parser.add_argument("-p", "--prefix", type=str, help="The words that provide the context for generation as a comma enclosed string.")
+parser.add_argument("-P", "--fileprefix", type=str, help="The words that provide the context for generation as a file.")
 parser.add_argument("-v", "--verbose", action="store_true", help="Display verbose output")
 args = parser.parse_args()
 
 s = SP(args.corpus)
-prefix = args.prefix.split()
+if args.prefix:
+    prefix = args.prefix.split()
+elif args.fileprefix:
+    prefix = open(args.fileprefix).read().lower().split()
+else:
+    print ("You must specify a prefix using the -p or -P flags.")
+    exit()
+
+
 i = prefix.index("_")
 if i == -1:
     print("Prefix must include an _ to mark the place that you want to generate the probabilities for.")
