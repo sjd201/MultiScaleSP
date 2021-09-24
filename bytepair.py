@@ -5,6 +5,7 @@ import functools
 import operator
 import sys
 from unidecode import unidecode
+import pickle
 
 basetokens = "abcdefghijklmnopqrstuvwxyz0123456789()[]+-?.,!$%^&_"
 EndOfWordCharacter = '_' # note this is not the standard underscore character
@@ -64,14 +65,24 @@ def get_tokens_from_vocab(vocab):
 def flatten(l):
     return functools.reduce(operator.iconcat, l, [])
 
-def bytepairtokenize(s, pattern):
-  words = [EndOfWordCharacter + word + EndOfWordCharacter for word in word_tokenize(s)]
-  return flatten([m.group() for m in re.finditer(pattern, word) if m.group() != ""] for word in words)
+def tokenizeword(word, pattern, vocabdict):
+    if word in vocabdict:
+        return vocabdict[word]
+    else:
+        word = EndOfWordCharacter + word + EndOfWordCharacter
+        return " ".join([m.group() for m in re.finditer(pattern, word) if m.group() != ""])
+
+def bytepairtokenize(s, pattern, vocablist):
+    
+    words = [tokenizeword(word, pattern, vocablist) for word in word_tokenize(s)]
+    return words
+  #words = [EndOfWordCharacter + word + EndOfWordCharacter for word in word_tokenize(s)]
+  #return flatten([m.group() for m in re.finditer(pattern, word) if m.group() != ""] for word in words)
 
 def learn (corpus, V):
   # create vocab
 
-  with open(corpus+"/rawcorpus", encoding='utf-8') as f:
+  with open(corpus+"/corpus", encoding='utf-8') as f:
       #text = unicodedata.normalize('NFKD', f.read()).encode('ascii','ignore')
       text = unidecode(f.read()).lower()
       toks = word_tokenize(text)
@@ -106,7 +117,20 @@ def learn (corpus, V):
   with open(corpus+"/vocab", "w", encoding='ascii') as vocabfile:   
     print ("\n".join(toks), file=vocabfile)
 
+  vocabdict = {}
+  for word in vocab:
+      vocabdict["".join(word.split())[1:-1]] = word
+  with open(corpus+"/vocabpickle", "wb") as vocabpicklefile:   
+      pickle.dump(vocabdict, vocabpicklefile)
+
+  
+
 def tokenize(corpus):
+
+    # get vocabdict from vocabpickle file
+
+    with open(corpus+"/vocabpickle", "rb") as vocabpicklefile:   
+        vocabdict = pickle.load(vocabpicklefile)
 
     # get vocab from vocab file
 
@@ -126,17 +150,8 @@ def tokenize(corpus):
     print (f"tokenizing {corpus}/corpus => {corpus}/corpus.tok")
     with open(corpus+"/corpus.tok", "w") as corpusfile:
         for line in open(corpus+"/corpus"):
-            print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
-
-    print (f"tokenizing {corpus}/train => {corpus}/train.tok")
-    with open(corpus+"/train.tok", "w") as corpusfile:
-        for line in open(corpus+"/train"):
-            print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
-
-    print (f"tokenizing {corpus}/test => {corpus}/test.tok")
-    with open(corpus+"/test.tok", "w") as corpusfile:
-        for line in open(corpus+"/test"):
-            print (" ".join(bytepairtokenize(line.lower(), pattern)), file=corpusfile)
+            line = unidecode(line).lower()
+            print (" ".join(bytepairtokenize(line, pattern, vocabdict)), file=corpusfile)
 
 def bpstr(l):
     result = ""
