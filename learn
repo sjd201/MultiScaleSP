@@ -1,12 +1,13 @@
-#!/usr/bin/python3
+#!/home/simon/MultiscaleSP/venv/bin/python3
 from sp import SP
 import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("corpus", type=str, help="The name of the corpus to train on")
 parser.add_argument("-i", "--iterations", type=int, help="Number of optimization iterations. Default = 5.", default=5)
+parser.add_argument("-s", "--training-corpus-size", type=int, help="Number of words to so optimization over. THe first N words of the corpus will be used. By default it will use 10000 words or the size of the corpus whichever is smaller.", default=10000)
 parser.add_argument("-c", "--constraints", type=str, help="Which constraints to train in a space separated string. Default = 'X BX AX XB XA ABX XBA CX MX HX KX CI MI HI KI'.", default='X BX AX XB XA ABX XBA CX MX HX KX CI MI HI KI')
 args = parser.parse_args()
 
 s = SP(args.corpus, args.constraints)
-s.learn(args.iterations)
+s.learn(args.iterations, args.training_corpus_size)

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/home/simon/MultiscaleSP/venv/bin/python3
 import argparse
 from sp import SP
 
@@ -37,5 +37,6 @@ if len(prefix) <= i + 2:
         print (s.strVec(s.prob(prefix[i-2], prefix[i-1], prefix[i+1], -1, cowan, miller, honeyhasson, kintsch)))
 else:
     print (s.strVec(s.prob(prefix[i-2], prefix[i-1], prefix[i+1], prefix[i+2], cowan, miller, honeyhasson, kintsch)))
+print()
 print (s.strNets(cowan, miller, honeyhasson, kintsch))
 

@@ -1,4 +1,4 @@
-from numpy import exp, array, zeros, ones, dot, set_printoptions, log2
+from numpy import exp, array, zeros, ones, dot, set_printoptions, log10, argmax, clip, sqrt
 from collections import Counter
 from scipy.sparse import load_npz, lil_matrix, csr_matrix
 import shelve
@@ -6,7 +6,7 @@ from numpy.random import choice
 set_printoptions(precision=2, edgeitems = 10, linewidth=200)
 import warnings
 from bytepair import bpstr
-#warnings.filterwarnings("ignore", message="Changing the sparsity structure of a csr_matrix is expensive.")
+warnings.filterwarnings("ignore", message="Changing the sparsity structure of a csr_matrix is expensive.")
 
 def sigmoid(v):
     try:
@@ -15,12 +15,34 @@ def sigmoid(v):
         print(v)
 
 def softmax(v):
-  if type(v) is lil_matrix:
-      v = v.toarray()
-  v = v-v.mean() # to avoid overflow errors
-  es = exp(v)
-  output = es/(es.sum()+0.00000001)
-  return output
+    if type(v) is lil_matrix:
+        v = v.toarray()
+    v = v-v.mean() # to avoid overflow errors
+    es = exp(v)
+    output = es/(es.sum()+0.00000001)
+    return output
+
+def sparsemax(v):
+    if type(v) is lil_matrix:
+        v = v.toarray()
+    z = v.copy()
+    z.sort()
+    K = z.shape[1]
+    z = z[0,::-1]
+    k = 1
+    total = z[0, 0]
+    try:
+        while k < z.shape[1] and 1 + k * z[0, k] > total:
+            total += z[0, k]
+            k += 1
+    except Exception as e:
+        print(z.shape, total.shape)
+        print (e)
+        exit()
+    tau = (total-1)/k
+    p = v-tau
+    p[p<0] = 0.0
+    return p
 
 class SP():
 
@@ -34,7 +56,7 @@ class SP():
     def __init__(self, corpus, constraints="X BX AX XB XA ABX XBA CX MX HX KX CI MI HI KI"):
         self.corpus = corpus
         self.constraints = set(constraints.split())  # which parameters to change when learning
-        self.lam = 0.001
+        self.lam = 0.0001
         self.vocab = [w.strip() for w in open(corpus+"/vocab", encoding='utf-8').readlines()]
         self.V = len(self.vocab)
         self.I = dict([(w.strip(), i) for i, w in enumerate(self.vocab)])
@@ -64,43 +86,53 @@ class SP():
         self.netKI = None
 
     def loadCounts(self):
-        self.BX = load_npz(self.corpus+f"/BX.npz")
+        self.BX = load_npz(self.corpus+f"/BX.npz") * 10000000
         self.X = self.BX.sum(axis=0)
-        self.AX = load_npz(self.corpus+f"/AX.npz")
-        self.ABX = load_npz(self.corpus+f"/ABX.npz")
-        self.XBA = load_npz(self.corpus+f"/XBA.npz")
-        self.CX = load_npz(self.corpus+f"/CX.npz")
-        self.MX = load_npz(self.corpus+f"/MX.npz")
-        self.HX = load_npz(self.corpus+f"/HX.npz")
-        self.KX = load_npz(self.corpus+f"/KX.npz")
+        self.AX = load_npz(self.corpus+f"/AX.npz") * 10000000
+        self.ABX = load_npz(self.corpus+f"/ABX.npz") * 10000000
+        self.XBA = load_npz(self.corpus+f"/XBA.npz") * 10000000
+        self.CX = load_npz(self.corpus+f"/CX.npz") * 10000000
+        self.MX = load_npz(self.corpus+f"/MX.npz") * 10000000
+        self.HX = load_npz(self.corpus+f"/HX.npz") * 10000000
+        self.KX = load_npz(self.corpus+f"/KX.npz") * 10000000
 
-        self.BX = log2(self.BX.todense()+SP.lidstone)
-        self.X = log2(self.X+SP.lidstone)
-        self.AX = log2(self.AX.todense()+SP.lidstone)
-        self.ABX = log2(self.ABX.todense()+SP.lidstone)
-        self.XBA = log2(self.XBA.todense()+SP.lidstone)
-        self.CX = log2(self.CX.todense()+SP.lidstone)
-        self.MX = log2(self.MX.todense()+SP.lidstone)
-        self.HX = log2(self.HX.todense()+SP.lidstone)
-        self.KX = log2(self.KX.todense()+SP.lidstone)
+        self.BX.data = log10(self.BX.data+1.0)
+        self.X = log10(self.X+1.0)
+        self.AX.data = log10(self.AX.data+1.0)
+        self.ABX.data = log10(self.ABX.data+1.0)
+        self.XBA.data = log10(self.XBA.data+1.0)
+        self.CX.data = log10(self.CX.data+1.0)
+        self.MX.data = log10(self.MX.data+1.0)
+        self.HX.data = log10(self.HX.data+1.0)
+        self.KX.data = log10(self.KX.data+1.0)
+
+        #self.BX = log10(self.BX.todense()+SP.lidstone)
+        #self.X = log10(self.X+SP.lidstone)
+        #self.AX = log10(self.AX.todense()+SP.lidstone)
+        #self.ABX = log10(self.ABX.todense()+SP.lidstone)
+        #self.XBA = log10(self.XBA.todense()+SP.lidstone)
+        #self.CX = log10(self.CX.todense()+SP.lidstone)
+        #self.MX = log10(self.MX.todense()+SP.lidstone)
+        #self.HX = log10(self.HX.todense()+SP.lidstone)
+        #self.KX = log10(self.KX.todense()+SP.lidstone)
         self.CountsLoaded = True
 
     def initParams(self):
-        self.Gax = 0.0
-        self.Gbx = 0.0
-        self.Gxa = 0.0
-        self.Gxb = 0.0
-        self.Gci = 0.0 # Cowan scale inhibition
-        self.Gmi = 0.0 # Miller scale inhibition
-        self.Ghi = 0.0 # Honey Hasson scale inhibition
-        self.Gki = 0.0 # Kintsch scale inhibition
-        self.Gx = 0.0
-        self.Gabx = 0.0
-        self.Gxba = 0.0
-        self.Gcx = zeros((self.V, 1))
-        self.Gmx = zeros((self.V, 1))
-        self.Ghx = zeros((self.V, 1))
-        self.Gkx = zeros((self.V, 1))
+        self.Gax = 1.0
+        self.Gbx = 1.0
+        self.Gxa = 1.0
+        self.Gxb = 1.0
+        self.Gci = -1.0 # Cowan scale inhibition
+        self.Gmi = -1.0 # Miller scale inhibition
+        self.Ghi = -1.0 # Honey Hasson scale inhibition
+        self.Gki = -1.0 # Kintsch scale inhibition
+        self.Gx = -1.0
+        self.Gabx = 1.0
+        self.Gxba = 1.0
+        self.Gcx = ones((self.V, 1)) / self.CowanBufferLength
+        self.Gmx = ones((self.V, 1)) / self.MillerBufferLength
+        self.Ghx = ones((self.V, 1)) / self.HoneyHassonBufferLength
+        self.Gkx = ones((self.V, 1)) / self.KintschBufferLength
 
     def strVec(self, v, NumToReport=14):
   
@@ -111,12 +143,12 @@ class SP():
       c = Counter(dict(enumerate(v2[0:len(self.vocab)])))
       res = ""
       for i,n in c.most_common(int(NumToReport/2)):
-           if abs(n) > 0.0001:
-               res += "{0} {1:1.3f} ".format(self.vocab[i], n)
+          if n != 0.0:
+              res += "{0} {1:1.3f} ".format(self.vocab[i], n)
       res += " ... "
       for i,n in c.most_common()[:-int(NumToReport/2)-1:-1][::-1]:
-           if abs(n) > 0.0001:
-               res += "{0} {1:1.3f} ".format(self.vocab[i], n)
+          if n != 0.0:
+              res += "{0} {1:1.3f} ".format(self.vocab[i], n)
       return res
 
     def saveParams(self):
@@ -185,6 +217,7 @@ class SP():
 
     def strNets(self, cowan, miller, honeyhasson, kintsch):
         result = "Weighted Nets:\n"
+        result += f"all: {self.strVec(self.net)}\n"
         #result += f"AX: {self.strVec(self.netAX)}\n"
         result += f"AX: {self.strVec(self.Gax * self.netAX)}\n"
         #result += f"BX: {self.strVec(self.netBX)}\n"
@@ -205,6 +238,7 @@ class SP():
         result += f"MX: {self.strVec(self.Gmx[miller, 0] * self.netMX)}\n"
         result += f"HX: {self.strVec(self.Ghx[honeyhasson, 0] * self.netHX)}\n"
         result += f"KX: {self.strVec(self.Gkx[kintsch, 0] * self.netKX)}\n"
+
         result += f"CI: {self.strVec(self.Gci * self.netCI)}\n"
         result += f"MI: {self.strVec(self.Gmi * self.netMI)}\n"
         result += f"HI: {self.strVec(self.Ghi * self.netHI)}\n"
@@ -220,6 +254,16 @@ class SP():
         if self.netXB is not None: 
         #    result += f"XB: {self.strVec(self.netXB)}\n"
             result += f"XB: {self.strVec(self.Gxb * self.netXB)}\n"
+        # show weights
+        result += "\nWeights\n"
+        cowanweights = " ".join(f"{self.vocab[i]}: {self.Gcx[i, 0]:1.3f}" for i in cowan)
+        result += f"Cowan: {cowanweights}\n"
+        millerweights = " ".join(f"{self.vocab[i]}: {self.Gmx[i, 0]:1.3f}" for i in miller)
+        result += f"Miller: {millerweights}\n"
+        honeyhassonweights = " ".join(f"{self.vocab[i]}: {self.Ghx[i, 0]:1.3f}" for i in honeyhasson)
+        result += f"HoneyHasson: {honeyhassonweights}\n"
+        kintschweights = " ".join(f"{self.vocab[i]}: {self.Gkx[i, 0]:1.3f}" for i in kintsch)
+        result += f"Kintsch: {kintschweights}\n"
         return result
 
     def prob(self, a, b, bafter, aafter, cowan, miller, honeyhasson, kintsch):
@@ -254,48 +298,56 @@ class SP():
             self.netXBA = self.XBA[baafter,:]
         self.netX = self.X
 
-        self.netCX = self.CX[cowan,:]/(len(cowan)+SP.epsilon)
-        self.netMX = self.MX[miller,:]/(len(miller)+SP.epsilon)
-        self.netHX = self.HX[honeyhasson,:]/(len(honeyhasson)+SP.epsilon)
-        self.netKX = self.KX[kintsch,:]/(len(kintsch)+SP.epsilon)
+        self.netCX = self.CX[cowan,:]
+        self.netMX = self.MX[miller,:]
+        self.netHX = self.HX[honeyhasson,:]
+        self.netKX = self.KX[kintsch,:]
 
-        self.netCI = zeros((1, self.V))
-        self.netMI = zeros((1, self.V))
-        self.netHI = zeros((1, self.V))
-        self.netKI = zeros((1, self.V))
-
-        #self.netCI = csr_matrix((1, self.V))
-        #self.netMI = csr_matrix((1, self.V))
-        #self.netHI = csr_matrix((1, self.V))
-        #self.netKI = csr_matrix((1, self.V))
+        self.netCI = csr_matrix((1, self.V))
+        self.netMI = csr_matrix((1, self.V))
+        self.netHI = csr_matrix((1, self.V))
+        self.netKI = csr_matrix((1, self.V))
         self.netCI[0, cowan] = 1.
         self.netMI[0, miller] = 1.
         self.netHI[0, honeyhasson] = 1.
         self.netKI[0, kintsch] = 1.
 
-        net = self.Gax * self.netAX 
-        net += self.Gbx * self.netBX
-        net += self.Gx * self.netX
-        net += self.Gcx[cowan, 0] * self.netCX
-        net += self.Gci * self.netCI
-        net += self.Gmx[miller, 0] * self.netMX
-        net += self.Gmi * self.netMI
-        net += self.Ghx[honeyhasson, 0] * self.netHX
-        net += self.Ghi * self.netHI
-        net += self.Gkx[kintsch, 0] * self.netKX
-        net += self.Gki * self.netKI
+        self.net = self.Gax * self.netAX 
+        self.net += self.Gbx * self.netBX
+        self.net += self.Gx * self.netX
+        #self.net += self.Gcx[cowan, 0] * self.netCX
+        self.net += self.Gci * self.netCI
+        #self.net += self.Gmx[miller, 0] * self.netMX
+        self.net += self.Gmi * self.netMI
+        #self.net += self.Ghx[honeyhasson, 0] * self.netHX
+        self.net += self.Ghi * self.netHI
+        if len(honeyhasson) > 0:
+            v = zeros((1, self.V))
+            attention = (sparsemax(-self.X[:, honeyhasson]))
+            for j in range(len(honeyhasson)):
+                v[0, honeyhasson[j]] += attention[0, j]
+            print (self.strVec(v))
+        #self.net += self.Gkx[kintsch, 0] * self.netKX
+        #if len(kintsch) > 0:
+        #    v = zeros((1, self.V))
+        #    attention = (sparsemax(-self.X[:, kintsch]))
+        #    for j in range(len(kintsch)):
+        #        v[0, kintsch[j]] += attention[0, j]
+        #    print (self.strVec(v))
+        self.net += self.Gki * self.netKI
         if ab != -1:
-            net += self.Gabx * self.netABX
+            self.net += self.Gabx * self.netABX
         if aafter != -1:
-            net += self.Gxa * self.netXA
+            self.net += self.Gxa * self.netXA
         if bafter != -1:
-            net += self.Gxb * self.netXB
+            self.net += self.Gxb * self.netXB
         if baafter != -1:
-            net +=  self.Gxba * self.netXBA
+            self.net +=  self.Gxba * self.netXBA
 
-        return softmax(net)
+        s = sparsemax(self.net)
+        return s
 
-    def sampler(self, prefix, BufferLength = 8, Threshold = 6):
+    def samplerGibbs(self, prefix, BufferLength = 8, Threshold = 6):
         buffer = ones(BufferLength, int) * -1
         bufferprobs = zeros(BufferLength)
         for i in range(len(prefix)):
@@ -317,13 +369,39 @@ class SP():
                 buffer[j] = c
                 bufferprobs[j] = ps[0, c]
             key = " ".join(self.vocab[w] for w in buffer)
+            print (key)
             print (" ".join(bpstr([self.vocab[buffer[k]]]) if k < len(prefix) else f"{bpstr([self.vocab[buffer[k]]])} ({bufferprobs[k]:1.2f})" for k in range(len(buffer))))
             counts[key] += 1
         return counts.most_common(1)[0][0]
 
+    def sampler(self, prefix, BufferLength = 8):
+        buffer = ones(BufferLength, int) * -1
+        bufferprobs = zeros(BufferLength)
+        for i in range(len(prefix)):
+            buffer[i] = self.I[prefix[i]]
+        for j in range(len(prefix), len(buffer)):
+            cowan = buffer[max(0, j - SP.CowanBufferLength):j]
+            miller = buffer[max(0, j - SP.MillerBufferLength):j]
+            honeyhasson = buffer[max(0, j - SP.HoneyHassonBufferLength):j]
+            kintsch = buffer[max(0, j - SP.KintschBufferLength):j]
+            if j == len(buffer)-2:
+                ps = array(self.prob(buffer[j-2], buffer[j-1], buffer[j+1], -1, cowan, miller, honeyhasson, kintsch))
+            elif j == len(buffer)-1:
+                ps = array(self.prob(buffer[j-2], buffer[j-1], -1, -1, cowan, miller, honeyhasson, kintsch))
+            else:
+                ps = array(self.prob(buffer[j-2], buffer[j-1], buffer[j+1], buffer[j+2], cowan, miller, honeyhasson, kintsch))
+            c = argmax(ps.ravel())
+            buffer[j] = c
+            #bufferprobs[j] = ps[0, c]
+            #key = " ".join(self.vocab[w] for w in buffer)
+            #print (" ".join(bpstr([self.vocab[buffer[k]]]) if k < len(prefix) else f"{bpstr([self.vocab[buffer[k]]])} ({bufferprobs[k]:1.2f})" for k in range(len(buffer))))
+        return buffer
+
+
 
     def learnOnePass (self, changeweights = True, verbose=False):
-        loglik = 0.0
+        se = 0.0
+        sa = 0.0
         count = 0
         for i in range(len(self.words)-4):
             cowan = self.words[max(0, i - SP.CowanBufferLength):i]
@@ -334,14 +412,15 @@ class SP():
             if verbose:
                 print (self.vocab[self.words[i+2]], ": ", self.strVec(output))
             c = self.words[i+2]
-            loglik += log2(output[0,c])
-            count += 1
           
-            if changeweights:
-                delta = -output 
-                delta [0,c] += 1
+            delta = -output 
+            delta [0,c] += 1
+            se += dot(delta, delta.T)[0,0]
+            sa += dot(output, output.T)[0,0]
+            count += 1
 
-                #delta = csr_matrix(delta)
+            if changeweights:
+                delta = csr_matrix(delta)
                 if "BX" in self.constraints:
                     self.Gbx += self.lam * dot(delta, self.netBX.T)[0,0]
                 if "AX" in self.constraints:
@@ -359,48 +438,75 @@ class SP():
                 if len(cowan) > 0:
                     if "CX" in self.constraints:
                         self.Gcx[cowan] += self.lam * dot(self.netCX, delta.T)
+                        #for i in cowan:
+                        #    if self.Gcx[i] < 0.0:
+                        #        self.Gcx[i] = 0.0
                     if "CI" in self.constraints:
                         self.Gci += self.lam * dot(self.netCI, delta.T)[0,0]
+                        #if self.Gci > 0.0:
+                        #    self.Gci = 0.0
                 if len(miller) > 0:
                     if "MX" in self.constraints:
                         self.Gmx[miller] += self.lam * dot(self.netMX, delta.T)
+                        #for i in miller:
+                        #    if self.Gmx[i] < 0.0:
+                        #        self.Gmx[i] = 0.0
                     if "MI" in self.constraints:
                         self.Gmi += self.lam * dot(self.netMI, delta.T)[0,0]
+                        #if self.Gmi > 0.0:
+                        #    self.Gmi = 0.0
                 if len(honeyhasson) > 0:
                     if "HX" in self.constraints:
                         self.Ghx[honeyhasson] += self.lam * dot(self.netHX, delta.T)
+                        #for i in honeyhasson:
+                        #    if self.Ghx[i] < 0.0:
+                        #        self.Ghx[i] = 0.0
                     if "HI" in self.constraints:
                         self.Ghi += self.lam * dot(self.netHI, delta.T)[0,0]
+                        #if self.Ghi > 0.0:
+                        #    self.Ghi = 0.0
                 if len(kintsch) > 0:
                     if "KX" in self.constraints:
                         self.Gkx[kintsch] += self.lam * dot(self.netKX, delta.T)
+                        #for i in kintsch:
+                        #    if self.Gkx[i] < 0.0:
+                        #        self.Gkx[i] = 0.0
                     if "KI" in self.constraints:
                         self.Gki += self.lam * dot(self.netKI, delta.T)[0,0]
+                        #if self.Gki > 0.0:
+                        #    self.Gki = 0.0
                 #self.netX = csr_matrix(self.netX)
 
                 if "X" in self.constraints:
-                    self.Gx += self.lam * dot(delta, self.netX.T)[0,0]
-        return loglik/count
+                    self.Gx += self.lam * (delta * self.netX.T)[0,0]
+        return sqrt(se/count), sqrt(sa/count)
     
 
-    def learn(self, NumberOfIterations):
+    def learn(self, NumberOfIterations, CorpusSize):
 
-        with open(self.corpus+"/train.tok", encoding='ascii') as f:
-            self.words = [self.I[w] for w in f.read().lower().split()]
+        self.words = []
+        with open(self.corpus+"/corpus.tok", encoding='ascii') as f:
+            for line in f:
+                self.words += [self.I[w] for w in line.lower().split()]
+                if len(self.words) >= CorpusSize:
+                    break
+        self.words = self.words[0:CorpusSize]
 
         for iteration in range(NumberOfIterations):
-            meannetlik = self.learnOnePass()
-            print (f"{iteration+1}/{NumberOfIterations}: perplexity: {2**(-meannetlik):1.4f} max: {self.V} {self.strParams()}")
+            rmse, rmsa = self.learnOnePass()
+            print (f"{iteration+1}/{NumberOfIterations}: rmse: {rmse:1.4f} rmsa: {rmsa:1.4f} {self.strParams()}")
             self.saveParams()
 
-    def test(self):
+    def test(self, size=None, verbose=False):
 
-        with open(self.corpus+"/test.tok", encoding='ascii') as f:
+        with open(self.corpus+"/corpus.tok", encoding='ascii') as f:
             self.words = [self.I[w] for w in f.read().lower().split()]
 
-        meannetlik = self.learnOnePass(changeweights = False, verbose=False)   
+        if size:
+            self.words = self.words[0:size]
+        rmse, rmsa = self.learnOnePass(changeweights = False, verbose=verbose)   
         print (self.strParams())
-        print (f"perplexity: {2**(-meannetlik):1.4f} max: {self.V}")
+        print (f"rmse: {rmse:1.4f} rmsa:{rmsa:1.4f}")
 
 if __name__ == "__main__":
     s = SP("small")

@@ -21,7 +21,7 @@ bigramI = dict([(w, i) for i, w in enumerate(bigramvocab)])
 
 print("Read corpus")
 
-corpus = open(args.corpus+"/corpus.tok").read().lower().split()
+corpus = open(args.corpus+"/corpus.tok", encoding="us-ascii").read().lower().split()
 
 print ("Count and save BX")
 

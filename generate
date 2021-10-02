@@ -24,9 +24,11 @@ def truncateToks (toks):
 result = args.prefix.split()
 newtoks = ["", "", "", ""]
 iterations = 0
-while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 6:
-    toks = s.sampler(result, BufferLength = len(result) + 4)
+while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 20:
+    toks = s.samplerGibbs(result, BufferLength = len(result) + 4)
+    print(toks)
     toks = toks.split()[len(result):]
+    #toks = toks[len(result):]
     newtoks = truncateToks(toks)
     result += newtoks
     iterations += 1

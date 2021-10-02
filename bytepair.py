@@ -148,8 +148,8 @@ def tokenize(corpus):
 
 
     print (f"tokenizing {corpus}/corpus => {corpus}/corpus.tok")
-    with open(corpus+"/corpus.tok", "w") as corpusfile:
-        for line in open(corpus+"/corpus"):
+    with open(corpus+"/corpus.tok", "w", encoding="ascii") as corpusfile:
+        for line in open(corpus+"/corpus", encoding = "utf-8"):
             line = unidecode(line).lower()
             print (" ".join(bytepairtokenize(line, pattern, vocabdict)), file=corpusfile)
 
@@ -157,17 +157,22 @@ def bpstr(l):
     result = ""
     for i in range(len(l)):
         tok = l[i]
-        if tok[-1] == "_":
-            if i == len(l)-1:
-                tok = tok[0:-1]
-            else:
-                tok = tok[0:-1] + " "
-        if tok[0] == "_":
-            tok = tok[1:]
-        result += tok
+        if tok == "_":
+            result += "_ "
+        else:
+            if tok[-1] == "_":
+                if i == len(l)-1:
+                    tok = tok[0:-1]
+                else:
+                    tok = tok[0:-1] + " "
+            if tok[0] == "_":
+                tok = tok[1:]
+
+            result += tok
     return result
 
 
 #print (bpstr(["_april_", "_is_", "_beg", "in", "ing_", "_today_"]))
-#s = ['_april_', '_is_', '_the_', '_sea', 's', 'on', 'al_', '_equivalent_', '_of_', '_october_', '_in_', '_the_', '_year_', '_,_', '_and_', '_in_', '_leap_', '_years_', '_,_', '_april_', '_fin', 'ishes_', '_on_', '_the_', '_same_', '_day_', '_of_']
-#print (bpstr(s))
+if __name__ == "__main__":
+    s = ['_april_', '_is_', '_', '_the_', '_sea', 's', 'on', 'al_', '_equivalent_', '_of_', '_october_', '_in_', '_the_', '_year_', '_,_', '_and_', '_in_', '_leap_', '_years_', '_,_', '_april_', '_fin', 'ishes_', '_on_', '_the_', '_same_', '_day_', '_of_']
+    print (bpstr(s))
