@@ -5,7 +5,7 @@ from bytepair import learn
 
 parser = argparse.ArgumentParser()
 parser.add_argument("corpus", type=str, help="The name of the corpus to process")
-parser.add_argument("-V", "--V", type=int, help="Specify the maximum size the vocabulary can take. Unique tokens that the program sees after this number will be ignored. Default = 10000.", default=10000)
+parser.add_argument("-V", "--V", type=int, help="Specify the maximum size the vocabulary can take. Unique tokens that the program sees after this number will be ignored. Default = 50000.", default=50000)
 args = parser.parse_args()
 
 learn(args.corpus, args.V)

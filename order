@@ -33,6 +33,7 @@ C = coo_matrix((c, (i, j)))
 Cij = C.tocsr()
 Cij.resize((V, V))
 save_npz(args.corpus+'/BX.npz', Cij)
+BXcounts = None # allow garbage collector to clean up 
 
 print ("Count and save AX")
 AXcounts = Counter(zip(corpus, corpus[2:]))
@@ -43,6 +44,7 @@ C = coo_matrix((c, (i, j)))
 Cij = C.tocsr()
 Cij.resize((V, V))
 save_npz(args.corpus+'/AX.npz', Cij)
+AXcounts = None # allow garbage collector to clean up 
 
 print ("Count and save ABX")
 
@@ -56,6 +58,7 @@ C = coo_matrix((c, (i, j)))
 Cij = C.tocsr()
 Cij.resize((bigramV, V))
 save_npz(args.corpus+'/ABX.npz', Cij)
+ABXcounts = None # allow garbage collector to clean up 
 
 
 print ("Count and save XBA")

@@ -3,7 +3,7 @@ import argparse
 from collections import Counter
 parser = argparse.ArgumentParser()
 parser.add_argument("corpus", type=str, help="The name of the corpus to process")
-parser.add_argument("-b", "--maxbigramvocabsize", type=int, help="Specify the maximum size the vocabulary can take. Default = 40000.", default=40000)
+parser.add_argument("-b", "--maxbigramvocabsize", type=int, help="Specify the maximum size the vocabulary can take. Default = 1000000.", default=1000000)
 args = parser.parse_args()
 
 

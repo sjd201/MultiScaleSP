@@ -1,6 +1,6 @@
 from numpy import exp, array, zeros, ones, dot, set_printoptions, log10, argmax, clip, sqrt
 from collections import Counter
-from scipy.sparse import load_npz, lil_matrix, csr_matrix
+from scipy.sparse import load_npz, lil_matrix, csr_matrix, csc_matrix
 import shelve
 from numpy.random import choice
 set_printoptions(precision=2, edgeitems = 10, linewidth=200)
@@ -86,15 +86,15 @@ class SP():
         self.netKI = None
 
     def loadCounts(self):
-        self.BX = load_npz(self.corpus+f"/BX.npz") * 10000000
+        self.BX = load_npz(self.corpus+f"/BX.npz") * 1000000000
         self.X = self.BX.sum(axis=0)
-        self.AX = load_npz(self.corpus+f"/AX.npz") * 10000000
-        self.ABX = load_npz(self.corpus+f"/ABX.npz") * 10000000
-        self.XBA = load_npz(self.corpus+f"/XBA.npz") * 10000000
-        self.CX = load_npz(self.corpus+f"/CX.npz") * 10000000
-        self.MX = load_npz(self.corpus+f"/MX.npz") * 10000000
-        self.HX = load_npz(self.corpus+f"/HX.npz") * 10000000
-        self.KX = load_npz(self.corpus+f"/KX.npz") * 10000000
+        self.AX = load_npz(self.corpus+f"/AX.npz") * 1000000000
+        self.ABX = load_npz(self.corpus+f"/ABX.npz") * 1000000000
+        self.XBA = load_npz(self.corpus+f"/XBA.npz") * 1000000000
+        self.CX = load_npz(self.corpus+f"/CX.npz") * 1000000000
+        self.MX = load_npz(self.corpus+f"/MX.npz") * 1000000000
+        self.HX = load_npz(self.corpus+f"/HX.npz") * 1000000000
+        self.KX = load_npz(self.corpus+f"/KX.npz") * 1000000000
 
         self.BX.data = log10(self.BX.data+1.0)
         self.X = log10(self.X+1.0)
@@ -129,14 +129,18 @@ class SP():
         self.Gx = -1.0
         self.Gabx = 1.0
         self.Gxba = 1.0
-        self.Gcx = ones((self.V, 1)) / self.CowanBufferLength
-        self.Gmx = ones((self.V, 1)) / self.MillerBufferLength
-        self.Ghx = ones((self.V, 1)) / self.HoneyHassonBufferLength
-        self.Gkx = ones((self.V, 1)) / self.KintschBufferLength
+        #self.Gcx = ones((self.V, 1)) / self.CowanBufferLength
+        #self.Gmx = ones((self.V, 1)) / self.MillerBufferLength
+        #self.Ghx = ones((self.V, 1)) / self.HoneyHassonBufferLength
+        #self.Gkx = ones((self.V, 1)) / self.KintschBufferLength
+        self.Gcx = 1.0
+        self.Gmx = 1.0
+        self.Ghx = 1.0
+        self.Gkx = 1.0
 
     def strVec(self, v, NumToReport=14):
   
-      if type(v) is lil_matrix or type(v) is csr_matrix:
+      if type(v) is lil_matrix or type(v) is csr_matrix or type(v) is csc_matrix:
           v = v.toarray()
       v = array(v)
       v2 = v.flatten()
@@ -209,10 +213,7 @@ class SP():
     def strParams(self, NumToReport=15):
         result =  f"Gabx = {self.Gabx:1.3f} Gxba = {self.Gxba:1.3f} Gax = {self.Gax:1.3f} Gbx = {self.Gbx:1.3f} Gxa = {self.Gxa:1.3f} Gxb = {self.Gxb:1.3f} Gx = {self.Gx:1.3f}\n"
         result += f"Gci = {self.Gci:1.3f} Gmi = {self.Gmi:1.3f} Ghi = {self.Ghi:1.3f} Gki = {self.Gki:1.3f}\n"
-        result +=  f"Gcx = {self.strVec(self.Gcx, NumToReport)}\n"
-        result +=  f"Gmx = {self.strVec(self.Gmx, NumToReport)}\n"
-        result +=  f"Ghx = {self.strVec(self.Ghx, NumToReport)}\n"
-        result +=  f"Gkx = {self.strVec(self.Gkx, NumToReport)}\n"
+        result +=  f"Gcx = {self.Gcx:1.3f} Gmx = {self.Gmx:1.3f} Ghx = {self.Ghx:1.3f} Gkx = {self.Gkx:1.3f}\n"
         return result
 
     def strNets(self, cowan, miller, honeyhasson, kintsch):
@@ -234,10 +235,10 @@ class SP():
         #for i, w in enumerate(kintsch):
         #    #result += f"KX({self.vocab[w]}): {self.strVec(self.netKX[i])}\n"
         #    result += f"weighted KX({self.vocab[w]}): {self.strVec(self.Gkx[w, 0] * self.netKX[i, :])}\n"
-        result += f"CX: {self.strVec(self.Gcx[cowan, 0] * self.netCX)}\n"
-        result += f"MX: {self.strVec(self.Gmx[miller, 0] * self.netMX)}\n"
-        result += f"HX: {self.strVec(self.Ghx[honeyhasson, 0] * self.netHX)}\n"
-        result += f"KX: {self.strVec(self.Gkx[kintsch, 0] * self.netKX)}\n"
+        result += f"CX: {self.strVec(self.Gcx * self.netCX)}\n"
+        result += f"MX: {self.strVec(self.Gmx * self.netMX)}\n"
+        result += f"HX: {self.strVec(self.Ghx * self.netHX)}\n"
+        result += f"KX: {self.strVec(self.Gkx * self.netKX)}\n"
 
         result += f"CI: {self.strVec(self.Gci * self.netCI)}\n"
         result += f"MI: {self.strVec(self.Gmi * self.netMI)}\n"
@@ -256,13 +257,13 @@ class SP():
             result += f"XB: {self.strVec(self.Gxb * self.netXB)}\n"
         # show weights
         result += "\nWeights\n"
-        cowanweights = " ".join(f"{self.vocab[i]}: {self.Gcx[i, 0]:1.3f}" for i in cowan)
+        cowanweights = " ".join(f"{self.vocab[i]}: {self.Gcx:1.3f}" for i in cowan)
         result += f"Cowan: {cowanweights}\n"
-        millerweights = " ".join(f"{self.vocab[i]}: {self.Gmx[i, 0]:1.3f}" for i in miller)
+        millerweights = " ".join(f"{self.vocab[i]}: {self.Gmx:1.3f}" for i in miller)
         result += f"Miller: {millerweights}\n"
-        honeyhassonweights = " ".join(f"{self.vocab[i]}: {self.Ghx[i, 0]:1.3f}" for i in honeyhasson)
+        honeyhassonweights = " ".join(f"{self.vocab[i]}: {self.Ghx:1.3f}" for i in honeyhasson)
         result += f"HoneyHasson: {honeyhassonweights}\n"
-        kintschweights = " ".join(f"{self.vocab[i]}: {self.Gkx[i, 0]:1.3f}" for i in kintsch)
+        kintschweights = " ".join(f"{self.vocab[i]}: {self.Gkx:1.3f}" for i in kintsch)
         result += f"Kintsch: {kintschweights}\n"
         return result
 
@@ -298,10 +299,29 @@ class SP():
             self.netXBA = self.XBA[baafter,:]
         self.netX = self.X
 
-        self.netCX = self.CX[cowan,:]
-        self.netMX = self.MX[miller,:]
-        self.netHX = self.HX[honeyhasson,:]
-        self.netKX = self.KX[kintsch,:]
+        if len(cowan) > 0:
+            attention = (sparsemax(-self.X[:, cowan]))
+            self.netCX = attention * self.CX[cowan,:]
+        else:
+            self.netCX = zeros((1,self.V))
+        if len(miller) > 0:
+            attention = (sparsemax(-self.X[:, miller]))
+            self.netMX = attention * self.MX[miller,:]
+        else:
+            self.netMX = zeros((1,self.V))
+        if len(honeyhasson) > 0:
+            attention = (sparsemax(-self.X[:, honeyhasson]))
+            self.netHX = attention * self.HX[honeyhasson,:]
+        else:
+            self.netHX = zeros((1,self.V))
+        if len(kintsch) > 0:
+            attention = (sparsemax(-self.X[:, kintsch]))
+            self.netKX = attention * self.KX[kintsch,:]
+        else:
+            self.netKX = zeros((1,self.V))
+        #self.netMX = self.MX[miller,:]
+        #self.netHX = self.HX[honeyhasson,:]
+        #self.netKX = self.KX[kintsch,:]
 
         self.netCI = csr_matrix((1, self.V))
         self.netMI = csr_matrix((1, self.V))
@@ -315,19 +335,19 @@ class SP():
         self.net = self.Gax * self.netAX 
         self.net += self.Gbx * self.netBX
         self.net += self.Gx * self.netX
-        #self.net += self.Gcx[cowan, 0] * self.netCX
+        self.net += self.Gcx * self.netCX
         self.net += self.Gci * self.netCI
-        #self.net += self.Gmx[miller, 0] * self.netMX
+        self.net += self.Gmx * self.netMX
         self.net += self.Gmi * self.netMI
-        #self.net += self.Ghx[honeyhasson, 0] * self.netHX
+        self.net += self.Ghx * self.netHX
         self.net += self.Ghi * self.netHI
-        if len(honeyhasson) > 0:
-            v = zeros((1, self.V))
-            attention = (sparsemax(-self.X[:, honeyhasson]))
-            for j in range(len(honeyhasson)):
-                v[0, honeyhasson[j]] += attention[0, j]
-            print (self.strVec(v))
-        #self.net += self.Gkx[kintsch, 0] * self.netKX
+        #if len(honeyhasson) > 0:
+        #    v = zeros((1, self.V))
+        #    attention = (sparsemax(-self.X[:, honeyhasson]))
+        #    for j in range(len(honeyhasson)):
+        #        v[0, honeyhasson[j]] += attention[0, j]
+        #    print (self.strVec(v))
+        self.net += self.Gkx * self.netKX
         #if len(kintsch) > 0:
         #    v = zeros((1, self.V))
         #    attention = (sparsemax(-self.X[:, kintsch]))
@@ -409,8 +429,6 @@ class SP():
             honeyhasson = self.words[max(0, i - SP.HoneyHassonBufferLength):i]
             kintsch = self.words[max(0, i - SP.KintschBufferLength):i]
             output = self.prob(self.words[i], self.words[i+1], self.words[i+3], self.words[i+4], cowan, miller, honeyhasson, kintsch)
-            if verbose:
-                print (self.vocab[self.words[i+2]], ": ", self.strVec(output))
             c = self.words[i+2]
           
             delta = -output 
@@ -418,6 +436,8 @@ class SP():
             se += dot(delta, delta.T)[0,0]
             sa += dot(output, output.T)[0,0]
             count += 1
+            if verbose:
+                print (f"{sqrt(se/count):1.3f} {self.vocab[self.words[i+2]]}: {self.strVec(output)}")
 
             if changeweights:
                 delta = csr_matrix(delta)
@@ -437,45 +457,24 @@ class SP():
                         self.Gxba += self.lam * dot(delta, self.netXBA.T)[0,0]
                 if len(cowan) > 0:
                     if "CX" in self.constraints:
-                        self.Gcx[cowan] += self.lam * dot(self.netCX, delta.T)
-                        #for i in cowan:
-                        #    if self.Gcx[i] < 0.0:
-                        #        self.Gcx[i] = 0.0
+                        self.Gcx += self.lam * dot(self.netCX, delta.T.todense())[0,0]
                     if "CI" in self.constraints:
                         self.Gci += self.lam * dot(self.netCI, delta.T)[0,0]
-                        #if self.Gci > 0.0:
-                        #    self.Gci = 0.0
                 if len(miller) > 0:
                     if "MX" in self.constraints:
-                        self.Gmx[miller] += self.lam * dot(self.netMX, delta.T)
-                        #for i in miller:
-                        #    if self.Gmx[i] < 0.0:
-                        #        self.Gmx[i] = 0.0
+                        self.Gmx += self.lam * dot(self.netMX, delta.T.todense())[0,0]
                     if "MI" in self.constraints:
                         self.Gmi += self.lam * dot(self.netMI, delta.T)[0,0]
-                        #if self.Gmi > 0.0:
-                        #    self.Gmi = 0.0
                 if len(honeyhasson) > 0:
                     if "HX" in self.constraints:
-                        self.Ghx[honeyhasson] += self.lam * dot(self.netHX, delta.T)
-                        #for i in honeyhasson:
-                        #    if self.Ghx[i] < 0.0:
-                        #        self.Ghx[i] = 0.0
+                        self.Ghx += self.lam * dot(self.netHX, delta.T.todense())[0,0]
                     if "HI" in self.constraints:
                         self.Ghi += self.lam * dot(self.netHI, delta.T)[0,0]
-                        #if self.Ghi > 0.0:
-                        #    self.Ghi = 0.0
                 if len(kintsch) > 0:
                     if "KX" in self.constraints:
-                        self.Gkx[kintsch] += self.lam * dot(self.netKX, delta.T)
-                        #for i in kintsch:
-                        #    if self.Gkx[i] < 0.0:
-                        #        self.Gkx[i] = 0.0
+                        self.Gkx += self.lam * dot(self.netKX, delta.T.todense())[0,0]
                     if "KI" in self.constraints:
                         self.Gki += self.lam * dot(self.netKI, delta.T)[0,0]
-                        #if self.Gki > 0.0:
-                        #    self.Gki = 0.0
-                #self.netX = csr_matrix(self.netX)
 
                 if "X" in self.constraints:
                     self.Gx += self.lam * (delta * self.netX.T)[0,0]
