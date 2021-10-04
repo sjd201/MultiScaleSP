@@ -11,7 +11,7 @@ basetokens = "abcdefghijklmnopqrstuvwxyz0123456789()[]+-?.,!$%^&_"
 EndOfWordCharacter = '_' # note this is not the standard underscore character
 EndOfWordCharacter = '_' 
 
-def build_vocab(corpus: str) -> dict:
+def build_vocab(corpus):
     """Step 1. Build vocab from text corpus"""
 
     # Separate each char in word by space and add mark end of token
@@ -24,7 +24,7 @@ def build_vocab(corpus: str) -> dict:
     return vocab
 
 
-def get_stats(vocab: dict) -> dict:
+def get_stats(vocab):
     """Step 2. Get counts of pairs of consecutive symbols"""
 
     pairs = defaultdict(int)
@@ -38,7 +38,7 @@ def get_stats(vocab: dict) -> dict:
     return pairs
 
 
-def merge_vocab(pair: tuple, v_in: dict) -> dict:
+def merge_vocab(pair, v_in):
     """Step 3. Merge all occurrences of the most frequent pair"""
     
     v_out = {}
