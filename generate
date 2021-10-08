@@ -24,16 +24,17 @@ def truncateToks (toks):
 result = args.prefix.split()
 newtoks = ["", "", "", ""]
 iterations = 0
-while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 20:
+samplerStop = False
+while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 8 and not samplerStop:
     toks = s.samplerGibbs(result, BufferLength = len(result) + 4)
-    print(toks)
-    toks = toks.split()[len(result):]
-    #toks = toks[len(result):]
-    newtoks = truncateToks(toks)
-    result += newtoks
-    iterations += 1
+    if toks:
+        toks = toks.split()[len(result):]
+        newtoks = truncateToks(toks)
+        result += newtoks
+        iterations += 1
+    else:
+        samplerStop = True
 
-print (result)
 print (bpstr(result))
      
 

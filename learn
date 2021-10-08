@@ -1,4 +1,5 @@
-#!/home/simon/MultiscaleSP/venv/bin/python3
+#!venv/bin/python3
+
 from sp import SP
 import argparse
 

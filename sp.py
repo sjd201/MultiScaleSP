@@ -138,7 +138,7 @@ class SP():
         self.Ghx = 1.0
         self.Gkx = 1.0
 
-    def strVec(self, v, NumToReport=14):
+    def strVec(self, v, NumToReport=14, NoZeros = False):
   
       if type(v) is lil_matrix or type(v) is csr_matrix or type(v) is csc_matrix:
           v = v.toarray()
@@ -147,11 +147,11 @@ class SP():
       c = Counter(dict(enumerate(v2[0:len(self.vocab)])))
       res = ""
       for i,n in c.most_common(int(NumToReport/2)):
-          if n != 0.0:
+          if n != 0 or not NoZeros:
               res += "{0} {1:1.3f} ".format(self.vocab[i], n)
       res += " ... "
       for i,n in c.most_common()[:-int(NumToReport/2)-1:-1][::-1]:
-          if n != 0.0:
+          if n != 0 or not NoZeros:
               res += "{0} {1:1.3f} ".format(self.vocab[i], n)
       return res
 
@@ -209,6 +209,21 @@ class SP():
         if "Gkx" in params.keys():
             self.Gkx = params["Gkx"]
         params.close()
+        if "X" not in self.constraints: self.Gx = 0.0
+        if "BX" not in self.constraints: self.Gbx = 0.0
+        if "AX" not in self.constraints: self.Gax = 0.0
+        if "ABX" not in self.constraints: self.Gabx = 0.0
+        if "XB" not in self.constraints: self.Gxb = 0.0
+        if "XA" not in self.constraints: self.Gxa = 0.0
+        if "XBA" not in self.constraints: self.Gxba = 0.0
+        if "CX" not in self.constraints: self.Gcx = 0.0
+        if "MX" not in self.constraints: self.Gmx = 0.0
+        if "HX" not in self.constraints: self.Ghx = 0.0
+        if "KX" not in self.constraints: self.Gkx = 0.0
+        if "CI" not in self.constraints: self.Gci = 0.0
+        if "MI" not in self.constraints: self.Gmi = 0.0
+        if "HI" not in self.constraints: self.Ghi = 0.0
+        if "KI" not in self.constraints: self.Gki = 0.0
 
     def strParams(self, NumToReport=15):
         result =  f"Gabx = {self.Gabx:1.3f} Gxba = {self.Gxba:1.3f} Gax = {self.Gax:1.3f} Gbx = {self.Gbx:1.3f} Gxa = {self.Gxa:1.3f} Gxb = {self.Gxb:1.3f} Gx = {self.Gx:1.3f}\n"
@@ -217,54 +232,56 @@ class SP():
         return result
 
     def strNets(self, cowan, miller, honeyhasson, kintsch):
+        t = zeros((1,self.V)) # temporary storage of attention weights
         result = "Weighted Nets:\n"
-        result += f"all: {self.strVec(self.net)}\n"
-        #result += f"AX: {self.strVec(self.netAX)}\n"
-        result += f"AX: {self.strVec(self.Gax * self.netAX)}\n"
-        #result += f"BX: {self.strVec(self.netBX)}\n"
-        result += f"BX: {self.strVec(self.Gbx * self.netBX)}\n"
-        #result += f"ABX: {self.strVec(self.netABX)}\n"
-        if self.netABX is not None: 
-            result += f"ABX: {self.strVec(self.Gabx * self.netABX)}\n"
-        #for i, w in enumerate(cowan):
-        #    #result += f"CX({self.vocab[w]}): {self.strVec(self.netCX[i])}\n"
-        #    result += f"weighted CX({self.vocab[w]}): {self.strVec(self.Gcx[w, 0] * self.netCX[i, :])}\n"
-        #for i, w in enumerate(miller):
-        #    #result += f"MX({self.vocab[w]}): {self.strVec(self.netMX[i])}\n"
-        #    result += f"weighted MX({self.vocab[w]}): {self.strVec(self.Gmx[w, 0] * self.netMX[i, :])}\n"
-        #for i, w in enumerate(kintsch):
-        #    #result += f"KX({self.vocab[w]}): {self.strVec(self.netKX[i])}\n"
-        #    result += f"weighted KX({self.vocab[w]}): {self.strVec(self.Gkx[w, 0] * self.netKX[i, :])}\n"
-        result += f"CX: {self.strVec(self.Gcx * self.netCX)}\n"
-        result += f"MX: {self.strVec(self.Gmx * self.netMX)}\n"
-        result += f"HX: {self.strVec(self.Ghx * self.netHX)}\n"
-        result += f"KX: {self.strVec(self.Gkx * self.netKX)}\n"
-
-        result += f"CI: {self.strVec(self.Gci * self.netCI)}\n"
-        result += f"MI: {self.strVec(self.Gmi * self.netMI)}\n"
-        result += f"HI: {self.strVec(self.Ghi * self.netHI)}\n"
-        result += f"KI: {self.strVec(self.Gki * self.netKI)}\n"
-        if self.netXBA is not None: 
-        #    result += f"XBA: {self.strVec(self.netXBA)}\n"
-            result += f"XBA: {self.strVec(self.Gxba * self.netXBA)}\n"
-        #result += f"X: {self.strVec(self.netX)}\n"
-        result += f"X: {self.strVec(self.Gx * self.netX)}\n"
-        if self.netXA is not None: 
-        #    result += f"XA: {self.strVec(self.netXA)}\n"
-            result += f"XA: {self.strVec(self.Gxa * self.netXA)}\n"
+        result += f"all: {self.strVec(self.net)}\n\n"
+        result += f"X({self.Gx:1.3f}): {self.strVec(self.Gx * self.netX, NoZeros = True)}\n"
+        result += f"BX({self.Gbx:1.3f}): {self.strVec(self.Gbx * self.netBX)}\n"
         if self.netXB is not None: 
-        #    result += f"XB: {self.strVec(self.netXB)}\n"
-            result += f"XB: {self.strVec(self.Gxb * self.netXB)}\n"
-        # show weights
-        result += "\nWeights\n"
-        cowanweights = " ".join(f"{self.vocab[i]}: {self.Gcx:1.3f}" for i in cowan)
-        result += f"Cowan: {cowanweights}\n"
-        millerweights = " ".join(f"{self.vocab[i]}: {self.Gmx:1.3f}" for i in miller)
-        result += f"Miller: {millerweights}\n"
-        honeyhassonweights = " ".join(f"{self.vocab[i]}: {self.Ghx:1.3f}" for i in honeyhasson)
-        result += f"HoneyHasson: {honeyhassonweights}\n"
-        kintschweights = " ".join(f"{self.vocab[i]}: {self.Gkx:1.3f}" for i in kintsch)
-        result += f"Kintsch: {kintschweights}\n"
+            result += f"XB({self.Gxb:1.3f}): {self.strVec(self.Gxb * self.netXB)}\n"
+        result += f"AX({self.Gax:1.3f}): {self.strVec(self.Gax * self.netAX)}\n"
+        if self.netXA is not None: 
+            result += f"XA({self.Gxa:1.3f}): {self.strVec(self.Gxa * self.netXA)}\n"
+        if self.netABX is not None: 
+            result += f"ABX({self.Gabx:1.3f}): {self.strVec(self.Gabx * self.netABX)}\n"
+        if self.netXBA is not None: 
+            result += f"XBA({self.Gxba:1.3f}): {self.strVec(self.Gxba * self.netXBA)}\n"
+        result += "\n"
+        result += f"CX({self.Gcx:1.3f}): {self.strVec(self.Gcx * self.netCX)}\n"
+        result += f"MX({self.Gmx:1.3f}): {self.strVec(self.Gmx * self.netMX)}\n"
+        result += f"HX({self.Ghx:1.3f}): {self.strVec(self.Ghx * self.netHX)}\n"
+        result += f"KX({self.Gkx:1.3f}): {self.strVec(self.Gkx * self.netKX)}\n"
+
+        result += "\n"
+        result += f"CI({self.Gci:1.3f}): {self.strVec(self.Gci * self.netCI, NoZeros = True)}\n"
+        result += f"MI({self.Gmi:1.3f}): {self.strVec(self.Gmi * self.netMI, NoZeros = True)}\n"
+        result += f"HI({self.Ghi:1.3f}): {self.strVec(self.Ghi * self.netHI, NoZeros = True)}\n"
+        result += f"KI({self.Gki:1.3f}): {self.strVec(self.Gki * self.netKI, NoZeros = True)}\n"
+
+        # attention weights
+        result += "\n"
+        result += "Attention Weights:\n"
+
+        if len(cowan) > 0:
+            attention = (sparsemax(-self.X[:, cowan]))
+            t[:,:] = 0.0
+            t[:, cowan] = attention
+            result += "Cowan: " + self.strVec(t, NoZeros = True) + "\n"
+        if len(miller) > 0:
+            attention = (sparsemax(-self.X[:, miller]))
+            t[:,:] = 0.0
+            t[:, miller] = attention
+            result += "Miller: " + self.strVec(t, NoZeros = True) + "\n"
+        if len(honeyhasson) > 0:
+            attention = (sparsemax(-self.X[:, honeyhasson]))
+            t[:,:] = 0.0
+            t[:, honeyhasson] = attention
+            result += "HoneyHasson: " + self.strVec(t, NoZeros = True) + "\n"
+        if len(kintsch) > 0:
+            attention = (sparsemax(-self.X[:, kintsch]))
+            t[:,:] = 0.0
+            t[:, kintsch] = attention
+            result += "Kintsch: " + self.strVec(t, NoZeros = True) + "\n"
         return result
 
     def prob(self, a, b, bafter, aafter, cowan, miller, honeyhasson, kintsch):
@@ -367,13 +384,14 @@ class SP():
         s = sparsemax(self.net)
         return s
 
-    def samplerGibbs(self, prefix, BufferLength = 8, Threshold = 6):
+    def samplerGibbs(self, prefix, BufferLength = 8, Threshold = 6, stopSampler = 40):
         buffer = ones(BufferLength, int) * -1
         bufferprobs = zeros(BufferLength)
         for i in range(len(prefix)):
             buffer[i] = self.I[prefix[i]]
         counts = Counter()
-        while len(counts) == 0 or counts.most_common(1)[0][1] < Threshold:
+        iteration = 0
+        while len(counts) == 0 or counts.most_common(1)[0][1] < Threshold and iteration < stopSampler:
             for j in range(len(prefix), len(buffer)):
                 cowan = buffer[max(0, j - SP.CowanBufferLength):j]
                 miller = buffer[max(0, j - SP.MillerBufferLength):j]
@@ -389,10 +407,13 @@ class SP():
                 buffer[j] = c
                 bufferprobs[j] = ps[0, c]
             key = " ".join(self.vocab[w] for w in buffer)
-            print (key)
             print (" ".join(bpstr([self.vocab[buffer[k]]]) if k < len(prefix) else f"{bpstr([self.vocab[buffer[k]]])} ({bufferprobs[k]:1.2f})" for k in range(len(buffer))))
             counts[key] += 1
-        return counts.most_common(1)[0][0]
+            iteration += 1
+        if iteration >= stopSampler:
+            return None
+        else:
+            return counts.most_common(1)[0][0]
 
     def sampler(self, prefix, BufferLength = 8):
         buffer = ones(BufferLength, int) * -1
@@ -419,10 +440,11 @@ class SP():
 
 
 
-    def learnOnePass (self, changeweights = True, verbose=False):
+    def learnOnePass (self, changeweights = True, verbose=False, regularise=False):
         se = 0.0
         sa = 0.0
         count = 0
+        correct = 0
         for i in range(len(self.words)-4):
             cowan = self.words[max(0, i - SP.CowanBufferLength):i]
             miller = self.words[max(0, i - SP.MillerBufferLength):i]
@@ -435,50 +457,68 @@ class SP():
             delta [0,c] += 1
             se += dot(delta, delta.T)[0,0]
             sa += dot(output, output.T)[0,0]
+            if argmax(output) == c:
+                correct += 1
             count += 1
             if verbose:
-                print (f"{sqrt(se/count):1.3f} {self.vocab[self.words[i+2]]}: {self.strVec(output)}")
+                print (f"{dot(delta, delta.T)[0,0]:1.3f} {self.vocab[self.words[i+2]]}: {self.strVec(output, NoZeros=True)}")
 
             if changeweights:
                 delta = csr_matrix(delta)
                 if "BX" in self.constraints:
                     self.Gbx += self.lam * dot(delta, self.netBX.T)[0,0]
+                    if regularise: self.Gbx -= self.lam * self.Gbx
                 if "AX" in self.constraints:
                     self.Gax += self.lam * dot(delta, self.netAX.T)[0,0]
+                    if regularise: self.Gax -= self.lam * self.Gax
                 if "XA" in self.constraints:
                     self.Gxa += self.lam * dot(delta, self.netXA.T)[0,0]
+                    if regularise: self.Gxa -= self.lam * self.Gxa
                 if "XB" in self.constraints:
                     self.Gxb += self.lam * dot(delta, self.netXB.T)[0,0]
+                    if regularise: self.Gxb -= self.lam * self.Gxb
                 if self.netABX is not None:
                     if "ABX" in self.constraints:
                         self.Gabx += self.lam * dot(delta, self.netABX.T)[0,0]   
+                        if regularise: self.Gabx -= self.lam * self.Gabx
                 if self.netXBA is not None:
                     if "XBA" in self.constraints:
                         self.Gxba += self.lam * dot(delta, self.netXBA.T)[0,0]
+                        if regularise: self.Gxba -= self.lam * self.Gxba
                 if len(cowan) > 0:
                     if "CX" in self.constraints:
                         self.Gcx += self.lam * dot(self.netCX, delta.T.todense())[0,0]
+                        if regularise: self.Gcx -= self.lam * self.Gcx
                     if "CI" in self.constraints:
                         self.Gci += self.lam * dot(self.netCI, delta.T)[0,0]
+                        if regularise: self.Gci -= self.lam * self.Gci
                 if len(miller) > 0:
                     if "MX" in self.constraints:
                         self.Gmx += self.lam * dot(self.netMX, delta.T.todense())[0,0]
+                        if regularise: self.Gmx -= self.lam * self.Gmx
                     if "MI" in self.constraints:
                         self.Gmi += self.lam * dot(self.netMI, delta.T)[0,0]
+                        if regularise: self.Gmi -= self.lam * self.Gmi
                 if len(honeyhasson) > 0:
                     if "HX" in self.constraints:
                         self.Ghx += self.lam * dot(self.netHX, delta.T.todense())[0,0]
+                        if regularise: self.Gkx -= self.lam * self.Gkx
                     if "HI" in self.constraints:
                         self.Ghi += self.lam * dot(self.netHI, delta.T)[0,0]
+                        if regularise: self.Ghi -= self.lam * self.Ghi
                 if len(kintsch) > 0:
                     if "KX" in self.constraints:
                         self.Gkx += self.lam * dot(self.netKX, delta.T.todense())[0,0]
+                        if regularise: self.Gkx -= self.lam * self.Gkx
                     if "KI" in self.constraints:
                         self.Gki += self.lam * dot(self.netKI, delta.T)[0,0]
+                        if regularise: self.Gki -= self.lam * self.Gki
 
                 if "X" in self.constraints:
                     self.Gx += self.lam * (delta * self.netX.T)[0,0]
-        return sqrt(se/count), sqrt(sa/count)
+                    if regularise: self.Gx -= self.lam * self.Gxa
+
+        return sqrt(se/count), sqrt(sa/count), correct/count
     
 
     def learn(self, NumberOfIterations, CorpusSize):
@@ -492,8 +532,8 @@ class SP():
         self.words = self.words[0:CorpusSize]
 
         for iteration in range(NumberOfIterations):
-            rmse, rmsa = self.learnOnePass()
-            print (f"{iteration+1}/{NumberOfIterations}: rmse: {rmse:1.4f} rmsa: {rmsa:1.4f} {self.strParams()}")
+            rmse, rmsa, correct = self.learnOnePass()
+            print (f"{iteration+1}/{NumberOfIterations}: rmse: {rmse:1.4f} rmsa: {rmsa:1.4f} correct: {correct:1.2f} {self.strParams()}", flush=True)
             self.saveParams()
 
     def test(self, size=None, verbose=False):
@@ -503,9 +543,9 @@ class SP():
 
         if size:
             self.words = self.words[0:size]
-        rmse, rmsa = self.learnOnePass(changeweights = False, verbose=verbose)   
+        rmse, rmsa, correct = self.learnOnePass(changeweights = False, verbose=verbose)   
         print (self.strParams())
-        print (f"rmse: {rmse:1.4f} rmsa:{rmsa:1.4f}")
+        print (f"rmse: {rmse:1.4f} rmsa:{rmsa:1.4f} correct:{correct:1.2f}")
 
 if __name__ == "__main__":
     s = SP("small")
