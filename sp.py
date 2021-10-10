@@ -284,6 +284,67 @@ class SP():
             result += "Kintsch: " + self.strVec(t, NoZeros = True) + "\n"
         return result
 
+    def select(self, words, vec):
+        if type(vec) == csr_matrix:
+            vec = vec.todense()
+        wordvec = zeros((1,self.V))
+        wordvec[0, words] = vec[0,words]
+        return wordvec
+
+    def trace(self, words, cowan, miller, honeyhasson, kintsch):
+        result = "Weighted Nets:\n"
+        result += f"all: {self.strVec(self.select(words, self.net), NoZeros=True)}\n\n"
+        result += f"X({self.Gx:1.3f}): {self.strVec(self.select(words, self.Gx * self.netX), NoZeros = True)}\n"
+        result += f"BX({self.Gbx:1.3f}): {self.strVec(self.select(words, self.Gbx * self.netBX), NoZeros=True)}\n"
+        if self.netXB is not None: 
+            result += f"XB({self.Gxb:1.3f}): {self.strVec(self.select(words, self.Gxb * self.netXB), NoZeros=True)}\n"
+        result += f"AX({self.Gax:1.3f}): {self.strVec(self.select(words, self.Gax * self.netAX), NoZeros=True)}\n"
+        if self.netXA is not None: 
+            result += f"XA({self.Gxa:1.3f}): {self.strVec(self.select(words, self.Gxa * self.netXA), NoZeros=True)}\n"
+        if self.netABX is not None: 
+            result += f"ABX({self.Gabx:1.3f}): {self.strVec(self.select(words, self.Gabx * self.netABX), NoZeros=True)}\n"
+        if self.netXBA is not None: 
+            result += f"XBA({self.Gxba:1.3f}): {sel.strVec(self.select(words, self.Gxba * self.netXBA), NoZeros=True)}\n"
+        result += "\n"
+        result += f"CX({self.Gcx:1.3f}): {self.strVec(self.select(words, self.Gcx * self.netCX), NoZeros=True)}\n"
+        result += f"MX({self.Gmx:1.3f}): {self.strVec(self.select(words, self.Gmx * self.netMX), NoZeros=True)}\n"
+        result += f"HX({self.Ghx:1.3f}): {self.strVec(self.select(words, self.Ghx * self.netHX), NoZeros=True)}\n"
+        result += f"KX({self.Gkx:1.3f}): {self.strVec(self.select(words, self.Gkx * self.netKX), NoZeros=True)}\n"
+
+        result += "\n"
+        result += f"CI({self.Gci:1.3f}): {self.strVec(self.select(words, self.Gci * self.netCI), NoZeros = True)}\n"
+        result += f"MI({self.Gmi:1.3f}): {self.strVec(self.select(words, self.Gmi * self.netMI), NoZeros = True)}\n"
+        result += f"HI({self.Ghi:1.3f}): {self.strVec(self.select(words, self.Ghi * self.netHI), NoZeros = True)}\n"
+        result += f"KI({self.Gki:1.3f}): {self.strVec(self.select(words, self.Gki * self.netKI), NoZeros = True)}\n"
+
+        # attention weights
+
+        t = zeros((1,self.V)) # temporary storage of attention weights
+        result += "\n"
+        result += "Attention Weights:\n"
+
+        if len(cowan) > 0:
+            attention = (sparsemax(-self.X[:, cowan]))
+            t[:,:] = 0.0
+            t[:, cowan] = attention
+            result += "Cowan: " + self.strVec(t, NoZeros = True) + "\n"
+        if len(miller) > 0:
+            attention = (sparsemax(-self.X[:, miller]))
+            t[:,:] = 0.0
+            t[:, miller] = attention
+            result += "Miller: " + self.strVec(t, NoZeros = True) + "\n"
+        if len(honeyhasson) > 0:
+            attention = (sparsemax(-self.X[:, honeyhasson]))
+            t[:,:] = 0.0
+            t[:, honeyhasson] = attention
+            result += "HoneyHasson: " + self.strVec(t, NoZeros = True) + "\n"
+        if len(kintsch) > 0:
+            attention = (sparsemax(-self.X[:, kintsch]))
+            t[:,:] = 0.0
+            t[:, kintsch] = attention
+            result += "Kintsch: " + self.strVec(t, NoZeros = True) + "\n"
+        return result
+
     def prob(self, a, b, bafter, aafter, cowan, miller, honeyhasson, kintsch):
 
         # lazy load counts and do log transform
@@ -384,7 +445,7 @@ class SP():
         s = sparsemax(self.net)
         return s
 
-    def samplerGibbs(self, prefix, BufferLength = 8, Threshold = 6, stopSampler = 40):
+    def samplerGibbs(self, prefix, BufferLength = 8, Threshold = 6, stopSampler = 1000):
         buffer = ones(BufferLength, int) * -1
         bufferprobs = zeros(BufferLength)
         for i in range(len(prefix)):

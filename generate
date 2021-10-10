@@ -26,7 +26,7 @@ newtoks = ["", "", "", ""]
 iterations = 0
 samplerStop = False
 while (set(newtoks) & EndOfUtteranceTokens) == set() and iterations < 8 and not samplerStop:
-    toks = s.samplerGibbs(result, BufferLength = len(result) + 4)
+    toks = s.samplerGibbs(result, BufferLength = len(result) + 3)
     if toks:
         toks = toks.split()[len(result):]
         newtoks = truncateToks(toks)
